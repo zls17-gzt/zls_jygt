@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#FFD700">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>家园沟通站</title>
+  <style>
+    body {
+      margin: 0; background: #FFF8E1; color: #5D4037;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      padding-bottom: 70px;
+    }
+    .page { display: none; padding: 16px; }
+    .page.active { display: block; }
+    .card { background: #fff; border-radius: 16px; padding: 16px;
+            margin-bottom: 12px; box-shadow: 0 2px 8px rgba(93,64,55,.08); }
+    input, textarea, select {
+      width: 100%; box-sizing: border-box; padding: 10px;
+      border: 1px solid #E0C97F; border-radius: 10px; font-size: 16px;
+      margin: 4px 0 12px; background: #FFFDF5;
+    }
+    /* 幼儿多选 */
+    .child-checks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .child-check {
+      display: flex; align-items: center; gap: 4px;
+      padding: 6px 10px; border-radius: 20px;
+      border: 1px solid #E0C97F; background: #FFFDF5;
+      font-size: 14px; cursor: pointer;
+    }
+    .child-check input { display: none; }
+    .child-check:has(input:checked) { background: #FFD700; border-color: #FF8F00; }
+    /* 图片上传与预览 */
+    .img-preview { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+    .img-preview img {
+      width: 72px; height: 72px; object-fit: cover;
+      border-radius: 8px; border: 1px solid #E0C97F;
+    }
+    .img-upload-btn {
+      width: 72px; height: 72px; border-radius: 8px;
+      border: 2px dashed #E0C97F; background: #FFFDF5;
+      color: #A1887F; font-size: 24px; display: flex;
+      align-items: center; justify-content: center; cursor: pointer;
+    }
+    button {
+      width: 100%; padding: 12px; border: none; border-radius: 12px;
+      background: #FFD700; color: #5D4037; font-size: 16px; font-weight: bold;
+    }
+    .tabbar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; background: #fff; border-top: 1px solid #eee;
+    }
+    .tabbar button { background: none; border-radius: 0; font-size: 13px; }
+    .tabbar button.active { color: #FF8F00; }
+    /* 周报图文输出区 */
+    .report-output {
+      width: 100%; min-height: 160px; box-sizing: border-box;
+      padding: 12px; border: 1px solid #E0C97F; border-radius: 10px;
+      background: #FFFDF5; font-size: 16px; line-height: 1.6;
+      margin: 12px 0; white-space: pre-wrap; overflow-wrap: break-word;
+    }
+    .report-output img {
+      max-width: 48%; border-radius: 8px; margin: 8px 4px 0 0;
+      display: inline-block; vertical-align: top;
+    }
+    /* 顶部班级切换条 */
+    .class-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff; border-radius: 12px; padding: 10px 12px;
+      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(93,64,55,.08);
+    }
+    /* 节假日倒计时日历卡片 */
+    .holiday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+    .holiday-card { background: #FFFDF5; border: 1px solid #E0C97F; border-radius: 14px; padding: 12px 6px; text-align: center; }
+    .holiday-card.today { background: #FFD700; border-color: #FF8F00; }
+    .holiday-card.past { background: #F5F5F5; border-color: #E0E0E0; opacity: .85; }
+    .holiday-date { display: flex; flex-direction: column; align-items: center; margin-bottom: 6px; }
+    .holiday-month { font-size: 12px; color: #A1887F; }
+    .holiday-day { font-size: 28px; font-weight: bold; color: #5D4037; line-height: 1; margin: 4px 0; }
+    .holiday-card.today .holiday-day { color: #5D4037; }
+    .holiday-week { font-size: 12px; color: #A1887F; }
+    .holiday-name { font-size: 14px; font-weight: bold; color: #5D4037; margin-bottom: 4px; }
+    .holiday-name.past-name { text-decoration: underline; color: #8D6E63; }
+    .holiday-tag { font-size: 10px; color: #A1887F; border: 1px solid #E0C97F; border-radius: 8px; padding: 1px 4px; margin-left: 2px; vertical-align: middle; }
+    .holiday-tag.custom { color: #FF8F00; border-color: #FFCC80; }
+    .holiday-count { font-size: 12px; color: #FF8F00; font-weight: bold; }
+    .holiday-card.past .holiday-count { color: #9E9E9E; }
+  </style>
+</head>
+<body>
+  <!-- 记录页（老师用） -->
+  <div id="page-record" class="page active">
+    <div class="class-bar"></div>
+    <div class="card">
+      <h3>📝 新记录</h3>
+      <label style="font-size:13px;color:#A1887F">选择幼儿（可多选）</label>
+      <div id="r-child-list" class="child-checks"></div>
+      <select id="r-area">
+        <option>建构区</option><option>美工区</option><option>角色区</option>
+        <option>益智区</option><option>阅读区</option><option>科学区</option>
+      </select>
+      <textarea id="r-text" rows="4" placeholder="孩子说了什么？做了什么？"></textarea>
+      <label style="font-size:13px;color:#A1887F">插入图片（最多3张，自动压缩）</label>
+      <div class="img-preview" id="r-img-preview">
+        <label class="img-upload-btn" for="r-img">+</label>
+      </div>
+      <input type="file" id="r-img" accept="image/*" multiple style="display:none" onchange="previewImages(this)">
+      <div id="r-edit-actions" style="display:none; gap:8px; margin-bottom:10px;">
+        <button onclick="deleteRecord()" style="background:#FF5252; color:#fff; margin-bottom:8px;">🗑 删除记录</button>
+        <button onclick="cancelEdit()" style="background:#E0E0E0; color:#5D4037;">取消编辑</button>
+      </div>
+      <button id="r-save-btn" onclick="saveRecord()">保存记录</button>
+    </div>
+    <div id="record-list"></div>
+  </div>
+  <!-- 周报页 -->
+  <div id="page-report" class="page">
+    <div class="class-bar"></div>
+    <div class="card">
+      <h3>📊 生成周报</h3>
+      <select id="w-child"></select>
+      <button onclick="genReport()">生成周报文字</button>
+      <div id="w-out" class="report-output" contenteditable="false"></div>
+      <button onclick="exportReportImage()">🖼 导出周报图片</button>
+      <button onclick="polishReport()">✨ AI 润色</button>
+      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">点击「导出周报图片」可把文字和照片合成一张图片，保存后直接发给家长。</p>
+    </div>
+  </div>
+  <!-- 孩子管理页 -->
+  <div id="page-kids" class="page">
+    <div class="class-bar"></div>
+    <div class="card">
+      <h3>👶 添加孩子</h3>
+      <input id="k-name" placeholder="姓名 *">
+      <select id="k-gender">
+        <option value="">性别</option>
+        <option value="男">男</option>
+        <option value="女">女</option>
+      </select>
+      <input id="k-birthday" type="date" placeholder="生日">
+      <input id="k-idcard" placeholder="身份证号">
+      <input id="k-parent-name" placeholder="家长姓名">
+      <input id="k-parent-phone" type="tel" placeholder="家长手机号（多个用空格或逗号分隔）">
+      <input id="k-note" placeholder="备注">
+      <button onclick="addChild()">添加</button>
+    </div>
+    <div class="card">
+      <h3>📥 批量导入</h3>
+      <button onclick="downloadChildTemplate()">下载 CSV 模板</button>
+      <p style="font-size:12px;color:#A1887F;margin:8px 0 8px">用 Excel / WPS 打开模板填写，保存后再点下面导入。</p>
+      <input type="file" id="k-import" accept=".csv" style="display:none" onchange="importChildren(this)">
+      <button onclick="document.getElementById('k-import').click()">导入 CSV 文件</button>
+    </div>
+    <div id="kid-list"></div>
+  </div>
+  <!-- 设置页 -->
+  <div id="page-settings" class="page">
+    <div class="card">
+      <h3>🏫 班级管理</h3>
+      <div id="class-list" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input id="new-class-name" placeholder="新班级名称" style="flex:1;margin:0;">
+        <button onclick="addClass(document.getElementById('new-class-name').value)" style="width:auto;flex:0;padding:8px 14px;">添加</button>
+      </div>
+      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
+    </div>
+    <div class="card">
+      <h3>🎉 节假日倒计时</h3>
+      <div id="holiday-list"></div>
+      <h4 style="margin:16px 0 8px;font-size:14px;">添加自定义节假日</h4>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input id="h-name" placeholder="名称，如：春游" style="flex:1;margin:0;">
+        <input id="h-date" type="date" style="flex:1;margin:0;">
+      </div>
+      <button onclick="addHoliday()">添加节假日</button>
+      <h4 style="margin:16px 0 8px;font-size:14px;">我的自定义节假日</h4>
+      <div id="custom-holiday-list"></div>
+      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">内置节假日为 2026 年示例日期，可用上方自定义节假日覆盖/补充。</p>
+    </div>
+    <div class="card">
+      <h3>⚙️ AI 设置</h3>
+      <label style="font-size:13px">DeepSeek API Key（用于 AI 润色，仅存本机）</label>
+      <input id="s-key" type="password" placeholder="粘贴你的 DeepSeek API Key">
+      <button onclick="saveKey()">保存密钥</button>
+    </div>
+    <div class="card">
+      <h3>💾 数据备份</h3>
+      <button onclick="exportBackup()">导出备份（JSON）</button>
+      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">建议每周导出一次，防止换手机/清数据丢失。</p>
+    </div>
+  </div>
+  <!-- 底部Tab -->
+  <div class="tabbar">
+    <button class="active" onclick="switchTab('record', this)">📝 记录</button>
+    <button onclick="switchTab('report', this)">📊 周报</button>
+    <button onclick="switchTab('kids', this)">👶 孩子</button>
+    <button onclick="switchTab('settings', this)">⚙️ 设置</button>
+  </div>
+  <script>
+    /* ============ B1-3：注册 Service Worker（仅 http(s) 下生效） ============ */
+    // 本地双击 file:// 打开时跳过注册，避免报错，功能仍可正常使用
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('./sw.js')
+    }
+
+    /* ============ B2 数据层：localStorage 存取（整个数据库就一个对象读写） ============ */
+    // 统一数据仓库：所有数据都在这一个key下
+    const STORE_KEY = 'jiayuan-data'
+    function load() {
+      try {
+        let db = JSON.parse(localStorage.getItem(STORE_KEY))
+        // 兼容旧数据（无班级概念）：迁移为「默认班级」
+        if (!db || !Array.isArray(db.classes)) {
+          const oldChildren = (db && db.children) || []
+          const oldRecords = (db && db.records) || []
+          oldChildren.forEach(c => {
+            if (c.parentPhone && !c.parentPhones) c.parentPhones = [c.parentPhone]
+            if (!c.parentPhones) c.parentPhones = []
+          })
+          oldRecords.forEach(r => {
+            if (r.childId && !r.childIds) {
+              r.childIds = [r.childId]
+              r.childNames = [r.childName || '']
+              delete r.childId
+              delete r.childName
+            }
+          })
+          db = {
+            classes: [{ id: 'class-' + Date.now(), name: '默认班级', children: oldChildren, records: oldRecords }],
+            currentClassId: null,
+            holidays: []
+          }
+        }
+        // 确保每个班级的孩子都兼容旧手机号格式
+        db.classes.forEach(cls => {
+          (cls.children || []).forEach(c => {
+            if (c.parentPhone && !c.parentPhones) c.parentPhones = [c.parentPhone]
+            if (!c.parentPhones) c.parentPhones = []
+          })
+        })
+        // 默认选中第一个班级
+        if (!db.currentClassId || !db.classes.find(c => c.id === db.currentClassId)) {
+          db.currentClassId = db.classes[0].id
+        }
+        return db
+      }
+      catch (e) { return { classes: [{ id: 'class-' + Date.now(), name: '默认班级', children: [], records: [] }], currentClassId: null, holidays: [] } }
+    }
+    function save(db) { localStorage.setItem(STORE_KEY, JSON.stringify(db)) }
+    // 当前班级快捷访问
+    function getCurrentClass() {
+      const db = load()
+      return db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
+    }
+    function setCurrentClass(id) {
+      const db = load()
+      if (db.classes.find(c => c.id === id)) {
+        db.currentClassId = id
+        save(db)
+        renderAll()
+      }
+    }
+    function addClass(name) {
+      const db = load()
+      const n = name.trim()
+      if (!n) return alert('请输入班级名称')
+      if (db.classes.find(c => c.name === n)) return alert('该班级已存在')
+      db.classes.push({ id: 'class-' + Date.now(), name: n, children: [], records: [] })
+      save(db)
+      document.getElementById('new-class-name').value = ''
+      renderAll()
+    }
+    function renameClass(id, name) {
+      const db = load()
+      const cls = db.classes.find(c => c.id === id)
+      if (!cls) return
+      const n = name.trim()
+      if (!n) return alert('班级名称不能为空')
+      cls.name = n
+      save(db)
+      renderAll()
+    }
+    function deleteClass(id) {
+      const db = load()
+      if (db.classes.length <= 1) return alert('至少保留一个班级')
+      if (!confirm('确定删除该班级？班级里的孩子与记录会一起删除，不可恢复。')) return
+      db.classes = db.classes.filter(c => c.id !== id)
+      if (db.currentClassId === id) db.currentClassId = db.classes[0].id
+      save(db)
+      renderAll()
+    }
+    // ---- 孩子 ----
+    function addChild() {
+      const name = document.getElementById('k-name').value.trim()
+      if (!name) return alert('请输入姓名')
+      const phones = parsePhones(document.getElementById('k-parent-phone').value)
+      if (phones === null) return alert('家长手机号应为 11 位数字（多个用空格或逗号分隔）')
+      const cls = getCurrentClass()
+      cls.children.push({
+        id: Date.now().toString(),
+        name,
+        gender: document.getElementById('k-gender').value,
+        birthday: document.getElementById('k-birthday').value,
+        idCard: document.getElementById('k-idcard').value.trim(),
+        parentName: document.getElementById('k-parent-name').value.trim(),
+        parentPhones: phones,
+        note: document.getElementById('k-note').value.trim(),
+        createdAt: new Date().toISOString()
+      })
+      save(load())
+      // 清空表单
+      document.getElementById('k-name').value = ''
+      document.getElementById('k-gender').value = ''
+      document.getElementById('k-birthday').value = ''
+      document.getElementById('k-idcard').value = ''
+      document.getElementById('k-parent-name').value = ''
+      document.getElementById('k-parent-phone').value = ''
+      document.getElementById('k-note').value = ''
+      renderAll()
+    }
+    // 仿写提示：删孩子 = db.children.filter(c => c.id !== id)，参考此模式写
+    // ---- 图片压缩与预览 ----
+    let pendingImages = []
+    let editingRecordId = null
+    function renderImagePreview() {
+      const preview = document.getElementById('r-img-preview')
+      preview.innerHTML = pendingImages.map((img, idx) => `
+        <div style="position:relative;width:72px;height:72px;">
+          <img src="${img}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #E0C97F;">
+          <span onclick="removePendingImage(${idx})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;background:#FF5252;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">×</span>
+        </div>
+      `).join('') + '<label class="img-upload-btn" for="r-img">+</label>'
+      preview.lastElementChild.style.display = pendingImages.length >= 3 ? 'none' : 'flex'
+    }
+    function removePendingImage(idx) {
+      pendingImages.splice(idx, 1)
+      renderImagePreview()
+    }
+    function compressImage(file, maxWidth, quality) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => {
+          const img = new Image()
+          img.onload = () => {
+            const canvas = document.createElement('canvas')
+            const scale = Math.min(1, maxWidth / img.width)
+            canvas.width = img.width * scale
+            canvas.height = img.height * scale
+            const ctx = canvas.getContext('2d')
+            ctx.fillStyle = '#fff'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+            resolve(canvas.toDataURL('image/jpeg', quality))
+          }
+          img.onerror = reject
+          img.src = e.target.result
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+    function previewImages(input) {
+      const remain = Math.max(0, 3 - pendingImages.length)
+      const files = Array.from(input.files || []).slice(0, remain)
+      if (!files.length) return alert('最多3张图片')
+      Promise.all(files.map(file => compressImage(file, 1024, 0.8)))
+        .then(dataUrls => {
+          pendingImages.push(...dataUrls)
+          renderImagePreview()
+          input.value = ''
+        })
+        .catch(() => alert('图片处理失败，请重试'))
+    }
+    // ---- 记录 ----
+    function saveRecord() {
+      const checked = [...document.querySelectorAll('input[name="r-child"]:checked')]
+      if (checked.length === 0) return alert('请至少选择一名幼儿')
+      const cls = getCurrentClass()
+      const payload = {
+        childIds: checked.map(cb => cb.value),
+        childNames: checked.map(cb => cb.dataset.name),
+        area: document.getElementById('r-area').value,
+        text: document.getElementById('r-text').value.trim(),
+        images: pendingImages.slice()
+      }
+      const isEdit = !!editingRecordId
+      if (isEdit) {
+        const idx = cls.records.findIndex(r => r.id === editingRecordId)
+        if (idx !== -1) cls.records[idx] = { ...cls.records[idx], ...payload }
+      } else {
+        cls.records.push({ id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), ...payload })
+      }
+      save(load())
+      cancelEdit()
+      renderAll()
+      alert(isEdit ? '已更新 ✅' : '已保存 ✅')
+    }
+    function editRecord(id) {
+      const cls = getCurrentClass()
+      const r = cls.records.find(x => x.id === id)
+      if (!r) return
+      editingRecordId = id
+      // 回填幼儿多选
+      document.querySelectorAll('input[name="r-child"]').forEach(cb => {
+        cb.checked = (r.childIds || []).includes(cb.value)
+      })
+      document.getElementById('r-area').value = r.area || '建构区'
+      document.getElementById('r-text').value = r.text || ''
+      // 回填图片
+      pendingImages = (r.images || []).slice()
+      renderImagePreview()
+      // 切换编辑模式
+      document.getElementById('r-edit-actions').style.display = 'block'
+      document.getElementById('r-save-btn').textContent = '更新记录'
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    function cancelEdit() {
+      editingRecordId = null
+      document.getElementById('r-text').value = ''
+      document.querySelectorAll('input[name="r-child"]').forEach(cb => cb.checked = false)
+      pendingImages = []
+      renderImagePreview()
+      document.getElementById('r-edit-actions').style.display = 'none'
+      document.getElementById('r-save-btn').textContent = '保存记录'
+    }
+    function deleteRecord() {
+      if (!editingRecordId) return
+      if (!confirm('确定删除这条记录吗？')) return
+      const cls = getCurrentClass()
+      cls.records = cls.records.filter(r => r.id !== editingRecordId)
+      save(load())
+      cancelEdit()
+      renderAll()
+      alert('已删除 ✅')
+    }
+    // ---- 渲染（页面打开和每次改动后都调用）----
+    function renderAll() {
+      const db = load()
+      const cls = getCurrentClass()
+      const children = cls.children || []
+      const records = cls.records || []
+      // 顶部班级选择器（记录页/孩子页/周报页）
+      document.querySelectorAll('.class-bar').forEach(bar => {
+        bar.innerHTML = `
+          <span style="font-size:13px;color:#A1887F">当前班级</span>
+          <select onchange="setCurrentClass(this.value)" style="margin:0;flex:1;min-width:120px;">
+            ${db.classes.map(c => `<option value="${c.id}" ${c.id === db.currentClassId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+        `
+      })
+      // 渲染幼儿多选列表
+      const rChildList = document.getElementById('r-child-list')
+      if (children.length === 0) {
+        rChildList.innerHTML = '<div style="color:#A1887F;font-size:13px">（当前班级还没有孩子）</div>'
+      } else {
+        rChildList.innerHTML = children.map(c => `
+          <label class="child-check">
+            <input type="checkbox" name="r-child" value="${c.id}" data-name="${c.name}">
+            <span>${c.name}</span>
+          </label>
+        `).join('')
+      }
+      // 填充周报下拉框
+      const opts = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+      document.getElementById('w-child').innerHTML = opts || '<option value="">（当前班级还没有孩子）</option>'
+      // 今日记录列表
+      const today = new Date().toISOString().slice(0, 10)
+      document.getElementById('record-list').innerHTML = records
+        .filter(r => r.date === today)
+        .map(r => `<div class="card"><b>${(r.childNames || ['未知']).join('、')}</b> · ${r.area}<br>${r.text}
+               ${(r.images || []).map(img => `<img src="${img}" style="max-width:100%;border-radius:8px;margin-top:8px;display:block;">`).join('')}
+               <div style="display:flex;gap:8px;margin-top:10px;">
+                 <button onclick="editRecord('${r.id}')" style="flex:1;width:auto;background:#FFE082;">✏️ 编辑</button>
+               </div>
+               <div style="color:#A1887F;font-size:12px;margin-top:6px">${r.date}</div></div>`)
+        .reverse().join('') || '<div class="card">今天还没有记录</div>'
+      // 孩子列表
+      document.getElementById('kid-list').innerHTML = children
+        .map(c => `<div class="card" onclick="toggleKidDetail('${c.id}')" style="cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b>${c.name}</b>
+            <span style="font-size:12px;color:#A1887F">${(c.parentPhones || []).join(' / ')}</span>
+          </div>
+          <div id="kid-detail-${c.id}" style="display:none;margin-top:8px;font-size:13px;color:#5D4037;line-height:1.6;">
+            ${c.gender ? '性别：' + escapeHtml(c.gender) + '<br>' : ''}
+            ${c.birthday ? '生日：' + escapeHtml(c.birthday) + '<br>' : ''}
+            ${c.idCard ? '身份证：' + escapeHtml(c.idCard) + '<br>' : ''}
+            ${c.parentName ? '家长姓名：' + escapeHtml(c.parentName) + '<br>' : ''}
+            ${((c.parentPhones || []).length) ? '家长手机号：' + c.parentPhones.map(p => `<a href="tel:${escapeHtml(p)}">${escapeHtml(p)}</a>`).join('、') + '<br>' : ''}
+            ${c.note ? '备注：' + escapeHtml(c.note) : ''}
+          </div>
+        </div>`).join('') || ''
+      // 设置页班级管理
+      renderClassSettings()
+      // 设置页节假日倒计时
+      renderHolidays()
+    }
+    function toggleKidDetail(id) {
+      const el = document.getElementById('kid-detail-' + id)
+      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'
+    }
+
+    /* ============ 班级管理：设置页渲染与操作 ============ */
+    function renderClassSettings() {
+      const db = load()
+      const list = document.getElementById('class-list')
+      if (!list) return
+      list.innerHTML = db.classes.map(c => `
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <input value="${escapeHtml(c.name)}" onchange="renameClass('${c.id}', this.value)"
+                 style="flex:1;margin:0;">
+          ${c.id === db.currentClassId ? '<span style="font-size:12px;color:#FF8F00">当前</span>' : '<span style="font-size:12px;color:#A1887F">切换</span>'}
+          <button onclick="deleteClass('${c.id}')" style="width:auto;flex:0;background:#FF5252;color:#fff;padding:8px 12px;">删除</button>
+        </div>
+      `).join('')
+    }
+
+    /* ============ 节假日倒计时（内置 + 自定义） ============ */
+    const BUILTIN_HOLIDAYS = {
+      '元旦': '2026-01-01',
+      '春节': '2026-02-17',
+      '清明节': '2026-04-05',
+      '劳动节': '2026-05-01',
+      '端午节': '2026-06-19',
+      '中秋节': '2026-09-25',
+      '国庆节': '2026-10-01'
+    }
+    // 内置节假日每年日期会变化，这里用 2026 年示例；用户可在设置页用自定义节假日覆盖/补充
+    function getAllHolidays() {
+      const db = load()
+      const customs = db.holidays || []
+      const list = Object.entries(BUILTIN_HOLIDAYS).map(([name, date]) => ({ name, date, builtin: true }))
+      customs.forEach(h => { list.push({ name: h.name, date: h.date, builtin: false }) })
+      return list
+    }
+    function daysUntil(dateStr) {
+      const target = new Date(dateStr + 'T00:00:00')
+      const now = new Date()
+      now.setHours(0, 0, 0, 0)
+      const diff = Math.ceil((target - now) / 86400000)
+      return diff
+    }
+    function formatWeekday(dateStr) {
+      const map = ['周日','周一','周二','周三','周四','周五','周六']
+      return map[new Date(dateStr + 'T00:00:00').getDay()]
+    }
+    function renderHolidays() {
+      const listEl = document.getElementById('holiday-list')
+      const customEl = document.getElementById('custom-holiday-list')
+      if (!listEl) return
+      const all = getAllHolidays()
+      // 排序：未来在前（按天数升序），已过的在后（按天数降序）
+      const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
+      const past = all.filter(h => daysUntil(h.date) < 0).sort((a, b) => daysUntil(b.date) - daysUntil(a.date))
+
+      listEl.innerHTML = '<div class="holiday-grid">' + future.concat(past).map(h => {
+        const d = daysUntil(h.date)
+        const date = new Date(h.date + 'T00:00:00')
+        const isPast = d < 0
+        const isToday = d === 0
+        const tagClass = h.builtin ? '' : 'custom'
+        const tagText = h.builtin ? '内置' : '自定义'
+        return `
+          <div class="holiday-card ${isPast ? 'past' : ''} ${isToday ? 'today' : ''}">
+            <div class="holiday-date">
+              <span class="holiday-month">${date.getMonth() + 1}月</span>
+              <span class="holiday-day">${date.getDate()}</span>
+              <span class="holiday-week">${formatWeekday(h.date)}</span>
+            </div>
+            <div class="holiday-name ${isPast ? 'past-name' : ''}">
+              ${escapeHtml(h.name)}
+              <span class="holiday-tag ${tagClass}">${tagText}</span>
+            </div>
+            <div class="holiday-count">
+              ${isToday ? '🎉 今天' : (isPast ? '已过 ' + Math.abs(d) + ' 天' : '还有 ' + d + ' 天')}
+            </div>
+          </div>
+        `
+      }).join('') + '</div>'
+
+      // 自定义列表（可删除）
+      if (customEl) {
+        const customs = (load().holidays || [])
+        customEl.innerHTML = customs.map((h, idx) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF3E0;">
+            <span style="font-size:14px;">${escapeHtml(h.name)} · ${h.date}</span>
+            <button onclick="deleteHoliday(${idx})" style="width:auto;flex:0;background:#FF5252;color:#fff;padding:6px 10px;">删除</button>
+          </div>
+        `).join('') || '<div style="font-size:13px;color:#A1887F">还没有自定义节假日</div>'
+      }
+    }
+    function addHoliday() {
+      const name = document.getElementById('h-name').value.trim()
+      const date = document.getElementById('h-date').value
+      if (!name || !date) return alert('请输入节假日名称和日期')
+      const db = load()
+      db.holidays = db.holidays || []
+      db.holidays.push({ name, date })
+      save(db)
+      document.getElementById('h-name').value = ''
+      document.getElementById('h-date').value = ''
+      renderHolidays()
+      alert('已添加 ✅')
+    }
+    function deleteHoliday(idx) {
+      const db = load()
+      db.holidays = db.holidays || []
+      db.holidays.splice(idx, 1)
+      save(db)
+      renderHolidays()
+    }
+
+    function downloadChildTemplate() {
+      const header = '姓名,性别,生日,身份证号,家长姓名,家长手机号,备注\n'
+      const sample = '张三,男,2019-05-12,310XXXXXXXXXXXXX,张爸爸,13800138000 13900139000,活泼好动\n'
+      const blob = new Blob(['\uFEFF' + header + sample], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '孩子信息导入模板.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    function importChildren(input) {
+      const file = input.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = e => {
+        const lines = String(e.target.result).split(/\r?\n/).filter(l => l.trim())
+        if (lines.length < 2) return alert('文件内容为空或缺少表头')
+        const header = parseCsvLine(lines[0]).map(h => h.trim())
+        const nameIdx = header.indexOf('姓名')
+        if (nameIdx === -1) return alert('模板缺少「姓名」列，请使用下载的模板')
+        const idx = key => header.indexOf(key)
+        let success = 0, fail = []
+        const cls = getCurrentClass()
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i])
+          const name = (cols[nameIdx] || '').trim()
+          if (!name) { fail.push('第' + (i + 1) + '行：姓名不能为空'); continue }
+          const phones = parsePhones(cols[idx('家长手机号')] || '')
+          if (phones === null) { fail.push('第' + (i + 1) + '行：手机号格式不正确'); continue }
+          cls.children.push({
+            id: Date.now().toString() + '-' + i,
+            name,
+            gender: (cols[idx('性别')] || '').trim(),
+            birthday: (cols[idx('生日')] || '').trim(),
+            idCard: (cols[idx('身份证号')] || '').trim(),
+            parentName: (cols[idx('家长姓名')] || '').trim(),
+            parentPhones: phones,
+            note: (cols[idx('备注')] || '').trim(),
+            createdAt: new Date().toISOString()
+          })
+          success++
+        }
+        save(load())
+        renderAll()
+        input.value = ''
+        let msg = '成功导入 ' + success + ' 个孩子'
+        if (fail.length) msg += '，' + fail.length + ' 行失败：\n' + fail.slice(0, 5).join('\n')
+        alert(msg)
+      }
+      reader.readAsText(file)
+    }
+    function parseCsvLine(line) {
+      const cols = []
+      let cur = '', inQuotes = false
+      for (const ch of line) {
+        if (ch === '"') inQuotes = !inQuotes
+        else if (ch === ',' && !inQuotes) { cols.push(cur); cur = '' }
+        else cur += ch
+      }
+      cols.push(cur)
+      return cols
+    }
+    // 解析手机号：支持多个，空格/逗号/分号/中文逗号分隔；空返回 []，含非法返回 null
+    function parsePhones(raw) {
+      const list = String(raw).split(/[，,；;\s]+/).map(s => s.trim()).filter(Boolean)
+      if (list.length === 0) return []
+      for (const p of list) if (!/^\d{11}$/.test(p)) return null
+      return list
+    }
+    renderAll()
+
+    /* ============ B3 周报生成：模板拼装（免费核心功能） ============ */
+    // 当前周报里的图片，AI 润色时只换文字、保留图片
+    let currentReportImages = []
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
+    }
+    function renderReport(text, images) {
+      const imageHtml = (images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      const html = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
+                   (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+      document.getElementById('w-out').innerHTML = html
+    }
+    function genReport() {
+      const cls = getCurrentClass()
+      const childSel = document.getElementById('w-child')
+      const childId = childSel.value
+      if (!childId) return alert('当前班级还没有孩子')
+      // 1. 取该孩子最近7天的记录（支持多名幼儿的记录）
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+      const records = cls.records.filter(r => ((r.childIds) || []).includes(childId) && r.date >= weekAgo)
+      if (records.length === 0) return alert('这个孩子最近7天还没有记录')
+      const childName = childSel.options[childSel.selectedIndex].text
+      // 2. 按区域分组统计
+      const byArea = {}
+      records.forEach(r => { (byArea[r.area] = byArea[r.area] || []).push(r) })
+      const areaLines = Object.entries(byArea)
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([area, rs]) => {
+          const quote = rs[rs.length - 1].text.slice(0, 50)   // 抽最近一条做代表
+          return `【${area}】本周参与 ${rs.length} 次。代表性表现：「${quote}…」`
+        })
+      // 3. 拼装周报文字
+      const today = new Date().toISOString().slice(0, 10)
+      const reportText = `🌟 ${childName} 本周成长周报（${weekAgo} ~ ${today}）\n本周共记录 ${records.length} 个精彩瞬间：\n\n${areaLines.join('\n\n')}\n\n💡 老师的话：________________\n\n如想了解更多细节，欢迎和老师交流～`
+      // 4. 收集该幼儿相关记录的图片（去重，最多6张）
+      const images = []
+      records.forEach(r => {
+        (r.images || []).forEach(img => { if (!images.includes(img)) images.push(img) })
+      })
+      currentReportImages = images
+      renderReport(reportText, images)
+    }
+    // 导出周报为图片：把文字和图片记录合成一张 PNG（纯 canvas，离线可用）
+    function exportReportImage() {
+      if (!currentReportImages.length && !document.getElementById('w-out').innerText.trim())
+        return alert('请先生成周报')
+      const scale = 2            // 高清倍数
+      const maxWidth = 600       // 内容区宽度
+      const padding = 24
+      const lineHeight = 24
+      const fontSize = 16
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      ctx.font = fontSize + 'px sans-serif'
+      // 1. 文字换行
+      const textLines = wrapText(ctx, document.getElementById('w-out').innerText, maxWidth)
+      const textHeight = textLines.length * lineHeight
+      // 2. 图片布局（每行2张）
+      const imgSize = (maxWidth - 8) / 2
+      const imgGap = 8
+      const imgRows = Math.ceil(currentReportImages.length / 2)
+      const imgHeight = imgRows > 0 ? imgRows * (imgSize + imgGap) : 0
+      const contentHeight = textHeight + (imgHeight > 0 ? 12 + imgHeight : 0)
+      const totalW = maxWidth + padding * 2
+      const totalH = contentHeight + padding * 2
+      canvas.width = totalW * scale
+      canvas.height = totalH * scale
+      ctx.scale(scale, scale)
+      // 3. 背景
+      ctx.fillStyle = '#FFFDF5'
+      ctx.fillRect(0, 0, totalW, totalH)
+      // 4. 文字
+      ctx.fillStyle = '#5D4037'
+      ctx.font = fontSize + 'px sans-serif'
+      ctx.textBaseline = 'top'
+      let y = padding
+      textLines.forEach(line => { ctx.fillText(line, padding, y); y += lineHeight })
+      // 5. 图片
+      if (currentReportImages.length > 0) {
+        y += 12
+        let pending = currentReportImages.length
+        currentReportImages.forEach((src, i) => {
+          const col = i % 2, row = Math.floor(i / 2)
+          const x = padding + col * (imgSize + imgGap)
+          const iy = y + row * (imgSize + imgGap)
+          const img = new Image()
+          img.onload = () => {
+            const ratio = Math.min(imgSize / img.width, imgSize / img.height)
+            const dw = img.width * ratio, dh = img.height * ratio
+            ctx.drawImage(img, x + (imgSize - dw) / 2, iy + (imgSize - dh) / 2, dw, dh)
+            ctx.strokeStyle = '#E0C97F'
+            ctx.lineWidth = 1
+            ctx.strokeRect(x, iy, imgSize, imgSize)
+            if (--pending === 0) downloadCanvas(canvas)
+          }
+          img.onerror = () => { if (--pending === 0) downloadCanvas(canvas) }
+          img.src = src
+        })
+      } else {
+        downloadCanvas(canvas)
+      }
+    }
+    function downloadCanvas(canvas) {
+      const url = canvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '周报-' + new Date().toISOString().slice(0, 10) + '.png'
+      a.click()
+      alert('周报图片已导出 ✅')
+    }
+    function wrapText(ctx, text, maxWidth) {
+      const lines = []
+      String(text).split('\n').forEach(para => {
+        if (para === '') { lines.push(''); return }
+        let line = ''
+        for (const ch of para) {
+          const test = line + ch
+          if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line); line = ch
+          } else { line = test }
+        }
+        if (line) lines.push(line)
+      })
+      return lines
+    }
+
+    /* ============ 补充功能：设置 / 导出备份 / AI 润色（手册 B2/B3 可选项） ============ */
+    // 密钥存 localStorage，不写死在代码里（手册要求）
+    function saveKey() {
+      const key = document.getElementById('s-key').value.trim()
+      if (!key) return alert('请输入密钥')
+      localStorage.setItem('jiayuan-deepseek-key', key)
+      alert('密钥已保存（仅存本机浏览器）✅')
+    }
+    function getKey() {
+      return localStorage.getItem('jiayuan-deepseek-key') || ''
+    }
+    // 导出备份：把 load() 返回的数据下载成 JSON 文件（手册要求的"通用技能10行"）
+    function exportBackup() {
+      const db = load()
+      const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'jiayuan-backup-' + new Date().toISOString().slice(0, 10) + '.json'
+      a.click()
+      URL.revokeObjectURL(url)
+      alert('已导出备份文件 ✅')
+    }
+    // AI 润色：把当前周报文字发给 DeepSeek；失败则回退模板版（手册要求）
+    async function polishReport() {
+      const apiKey = getKey()
+      if (!apiKey) return alert('请先在「设置」里填写 DeepSeek API Key')
+      const out = document.getElementById('w-out')
+      const base = (out.innerText || out.textContent || '').trim()
+      if (!base) return alert('请先生成周报文字')
+      if (!confirm('将用 AI 润色当前周报（消耗约几分钱），是否继续？')) return
+      try {
+        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: '你是一位幼儿园老师，擅长把孩子的成长记录润色成温暖、生动、适合发给家长的周报文字。只返回润色后的正文，不要解释。' },
+              { role: 'user', content: base }
+            ],
+            temperature: 0.6
+          })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const data = await res.json()
+        const polished = data.choices[0].message.content.trim()
+        renderReport(polished, currentReportImages)
+        alert('AI 润色完成 ✨')
+      } catch (e) {
+        alert('AI 润色失败（' + e.message + '），已保留原有模板文字。如要稳定用 AI，建议升级方式A。')
+      }
+    }
+
+    /* ============ 底部Tab切换 ============ */
+    function switchTab(name, btn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+      document.getElementById('page-' + name).classList.add('active')
+      document.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+    }
+  </script>
+</body>
+</html>
