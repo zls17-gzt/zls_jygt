@@ -4,21 +4,21 @@
 
 方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v10**。
 
-**已部署公网网址（HTTPS，长期可用）：**
+**永久网址（GitHub Pages，自主可控）：**
+https://zls17-gzt.github.io/zls_jygt/
+
+**备用网址（WorkBuddy 云托管，长期可用）：**
 https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 
-手机/电脑浏览器打开即可使用，可「添加到主屏幕」当作 App；离线也能打开（Service Worker 在 https 下生效）。
+两个网址都能用，手机/电脑浏览器打开即可，可「添加到主屏幕」当作 App；离线也能打开（Service Worker 在 https 下生效）。**建议以 GitHub Pages 网址为主**，它不依赖任何第三方、只要仓库在就一直有效。
 
-> 该链接依托 WorkBuddy 云托管，长期有效；可作为临时/备用网址。
+## 部署到 GitHub Pages（已完成 ✅）
 
-## 部署到 GitHub Pages（用户已选，永久自主）
-
-用户已明确要求走 GitHub Pages 永久托管（见 `搭建与测试说明.md` B4 章节）。
-
-- **代码已就绪**：本机 `jiayuan-workbench/` 已 `git init` 并提交初始版本（含 `.nojekyll`）。
-- **两种方式**：① 网页拖拽上传 6 个文件（推荐，零安装）；② 装 `gh` 并 `gh auth login` 后由我一键发布。
-- **必须用户本人做的步骤**：注册 GitHub 账号、创建 `jiayuan-workbench` 公开仓库、开启 Pages（`Settings → Pages → main / (root)`）。
-- **最终网址**：`https://你的用户名.github.io/jiayuan-workbench/`（永久有效，不依赖第三方）。
+- **仓库**：https://github.com/zls17-gzt/zls_jygt （Public，空仓库初始化）
+- **推送方式**：用户提供 Classic PAT，已 `git push` 到 `main` 分支（含 `.nojekyll`）。
+- **Pages**：已通过 GitHub API 开启，`source = main / (root)`，构建完成返回 200。
+- **永久网址**：https://zls17-gzt.github.io/zls_jygt/ （实测可访问，title=家园沟通站）
+- **后续更新**：修改代码后，把 `sw.js` 的 `CACHE_NAME` 升一版（如 v11），再 `git push` 即可；手机端关掉重开生效。
 
 ## 本次改动（v10）
 
