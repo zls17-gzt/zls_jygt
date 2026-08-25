@@ -1,6 +1,9 @@
-const CACHE_NAME = 'jiayuan-v10'
+const CACHE_NAME = 'jiayuan-v11'
 const ASSETS = ['./', './index.html', './manifest.json',
-                './icon-192.png', './icon-512.png']
+                './icon-192.png', './icon-512.png',
+                './icons/mascot.png', './icons/eat.png', './icons/work.png',
+                './icons/sport.png', './icons/briefcase.png', './icons/flower.png',
+                './icons/drink.png', './icons/rest.png', './icons/card.png']
 // 安装：逐个缓存，单个失败不拖垮整体
 self.addEventListener('install', (e) => {
   e.waitUntil(

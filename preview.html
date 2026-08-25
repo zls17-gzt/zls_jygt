@@ -8,113 +8,224 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>家园沟通站</title>
   <style>
+    :root {
+      --bg: #FFF9E6;
+      --card: #FFFFFF;
+      --card-soft: #FFFBF0;
+      --primary: #FFD700;
+      --primary-dark: #FF8F00;
+      --text: #5D4037;
+      --text-light: #8D6E63;
+      --muted: #A1887F;
+      --border: #F0E0B8;
+      --shadow: 0 4px 16px rgba(93,64,55,.08);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
-      margin: 0; background: #FFF8E1; color: #5D4037;
-      font-family: -apple-system, "PingFang SC", sans-serif;
-      padding-bottom: 70px;
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding-bottom: 80px;
     }
-    .page { display: none; padding: 16px; }
+    .app-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: linear-gradient(180deg, #FFF2C2 0%, var(--bg) 100%);
+      padding: 14px 16px 10px; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid rgba(224,201,127,.3);
+    }
+    .app-title { font-size: 18px; font-weight: bold; color: var(--text); }
+    .app-title small { display: block; font-size: 12px; color: var(--muted); font-weight: normal; margin-top: 2px; }
+    .app-status {
+      font-size: 11px; color: #689F38; background: #F1F8E9;
+      padding: 4px 8px; border-radius: 12px; display: flex; align-items: center; gap: 4px;
+    }
+    .app-status::before { content: ""; width: 6px; height: 6px; background: #8BC34A; border-radius: 50%; }
+    .page { display: none; padding: 86px 16px 16px; }
     .page.active { display: block; }
-    .card { background: #fff; border-radius: 16px; padding: 16px;
-            margin-bottom: 12px; box-shadow: 0 2px 8px rgba(93,64,55,.08); }
-    input, textarea, select {
-      width: 100%; box-sizing: border-box; padding: 10px;
-      border: 1px solid #E0C97F; border-radius: 10px; font-size: 16px;
-      margin: 4px 0 12px; background: #FFFDF5;
+    .card {
+      background: var(--card); border-radius: 20px; padding: 16px;
+      margin-bottom: 14px; box-shadow: var(--shadow);
     }
+    .card h3 { margin: 0 0 12px; font-size: 16px; color: var(--text); }
+    input, textarea, select {
+      width: 100%; box-sizing: border-box; padding: 12px;
+      border: 1px solid var(--border); border-radius: 12px; font-size: 16px;
+      margin: 4px 0 12px; background: var(--card-soft); color: var(--text);
+    }
+    button {
+      width: 100%; padding: 12px; border: none; border-radius: 14px;
+      background: var(--primary); color: var(--text); font-size: 15px; font-weight: bold;
+      box-shadow: 0 2px 0 #E0C97F;
+    }
+    button:active { transform: translateY(1px); box-shadow: none; }
+    button.secondary { background: var(--card-soft); color: var(--text-light); box-shadow: 0 2px 0 var(--border); }
+    button.danger { background: #FF8A80; color: #fff; box-shadow: 0 2px 0 #E57373; }
+
+    /* 首页 */
+    .hero-card {
+      background: linear-gradient(135deg, #FFF8D6 0%, #FFECB3 100%);
+      border: 1px solid #FFE082; position: relative; overflow: hidden;
+    }
+    .hero-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .greeting { font-size: 18px; font-weight: bold; color: var(--text); }
+    .hero-time { font-size: 42px; font-weight: bold; color: var(--text); line-height: 1.1; margin-top: 6px; }
+    .hero-date { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+    .hero-mascot { width: 110px; height: 110px; object-fit: contain; }
+    .quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+    .quick-btn {
+      background: var(--card); border-radius: 16px; padding: 12px;
+      display: flex; align-items: center; gap: 8px; font-size: 14px;
+      box-shadow: 0 2px 8px rgba(93,64,55,.06); border: 1px solid var(--border);
+    }
+    .quick-btn img { width: 32px; height: 32px; object-fit: contain; }
+    .quick-btn span { font-weight: bold; color: var(--text); }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .stat-card {
+      background: var(--card); border-radius: 18px; padding: 14px 8px; text-align: center;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+    }
+    .stat-num { font-size: 26px; font-weight: bold; color: var(--primary-dark); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .tip-card { background: #FFF8E1; border: 1px solid #FFE082; }
+    .tip-title { font-size: 15px; font-weight: bold; color: var(--text); margin-bottom: 6px; }
+    .tip-text { font-size: 14px; color: var(--text-light); line-height: 1.5; }
+
+    /* 顶部班级切换条 */
+    .class-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card); border-radius: 14px; padding: 10px 12px;
+      margin-bottom: 14px; box-shadow: var(--shadow); border: 1px solid var(--border);
+    }
+
     /* 幼儿多选 */
     .child-checks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .child-check {
       display: flex; align-items: center; gap: 4px;
-      padding: 6px 10px; border-radius: 20px;
-      border: 1px solid #E0C97F; background: #FFFDF5;
+      padding: 8px 12px; border-radius: 20px;
+      border: 1px solid var(--border); background: var(--card-soft);
       font-size: 14px; cursor: pointer;
     }
     .child-check input { display: none; }
-    .child-check:has(input:checked) { background: #FFD700; border-color: #FF8F00; }
+    .child-check:has(input:checked) { background: var(--primary); border-color: var(--primary-dark); }
+
     /* 图片上传与预览 */
     .img-preview { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
     .img-preview img {
       width: 72px; height: 72px; object-fit: cover;
-      border-radius: 8px; border: 1px solid #E0C97F;
+      border-radius: 10px; border: 1px solid var(--border);
     }
     .img-upload-btn {
-      width: 72px; height: 72px; border-radius: 8px;
-      border: 2px dashed #E0C97F; background: #FFFDF5;
-      color: #A1887F; font-size: 24px; display: flex;
+      width: 72px; height: 72px; border-radius: 10px;
+      border: 2px dashed var(--border); background: var(--card-soft);
+      color: var(--muted); font-size: 24px; display: flex;
       align-items: center; justify-content: center; cursor: pointer;
     }
-    button {
-      width: 100%; padding: 12px; border: none; border-radius: 12px;
-      background: #FFD700; color: #5D4037; font-size: 16px; font-weight: bold;
-    }
-    .tabbar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      display: flex; background: #fff; border-top: 1px solid #eee;
-    }
-    .tabbar button { background: none; border-radius: 0; font-size: 13px; }
-    .tabbar button.active { color: #FF8F00; }
-    /* 周报图文输出区 */
+
+    /* 周报输出区 */
     .report-output {
       width: 100%; min-height: 160px; box-sizing: border-box;
-      padding: 12px; border: 1px solid #E0C97F; border-radius: 10px;
-      background: #FFFDF5; font-size: 16px; line-height: 1.6;
+      padding: 14px; border: 1px solid var(--border); border-radius: 14px;
+      background: var(--card-soft); font-size: 16px; line-height: 1.6;
       margin: 12px 0; white-space: pre-wrap; overflow-wrap: break-word;
     }
-    .report-output img {
-      max-width: 48%; border-radius: 8px; margin: 8px 4px 0 0;
-      display: inline-block; vertical-align: top;
-    }
-    /* 顶部班级切换条 */
-    .class-bar {
-      display: flex; align-items: center; gap: 8px;
-      background: #fff; border-radius: 12px; padding: 10px 12px;
-      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(93,64,55,.08);
-    }
-    /* 节假日倒计时日历卡片 */
-    .holiday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
-    .holiday-card { background: #FFFDF5; border: 1px solid #E0C97F; border-radius: 14px; padding: 12px 6px; text-align: center; }
-    .holiday-card.today { background: #FFD700; border-color: #FF8F00; }
+    .report-output img { max-width: 48%; border-radius: 8px; margin: 8px 4px 0 0; display: inline-block; vertical-align: top; }
+
+    /* 记录/孩子卡片 */
+    .record-card, .kid-card { cursor: pointer; }
+    .record-card img, .kid-card img { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
+
+    /* 节假日倒计时 */
+    .holiday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+    .holiday-card { background: var(--card-soft); border: 1px solid var(--border); border-radius: 16px; padding: 12px 6px; text-align: center; }
+    .holiday-card.today { background: var(--primary); border-color: var(--primary-dark); }
     .holiday-card.past { background: #F5F5F5; border-color: #E0E0E0; opacity: .85; }
     .holiday-date { display: flex; flex-direction: column; align-items: center; margin-bottom: 6px; }
-    .holiday-month { font-size: 12px; color: #A1887F; }
-    .holiday-day { font-size: 28px; font-weight: bold; color: #5D4037; line-height: 1; margin: 4px 0; }
-    .holiday-card.today .holiday-day { color: #5D4037; }
-    .holiday-week { font-size: 12px; color: #A1887F; }
-    .holiday-name { font-size: 14px; font-weight: bold; color: #5D4037; margin-bottom: 4px; }
-    .holiday-name.past-name { text-decoration: underline; color: #8D6E63; }
-    .holiday-tag { font-size: 10px; color: #A1887F; border: 1px solid #E0C97F; border-radius: 8px; padding: 1px 4px; margin-left: 2px; vertical-align: middle; }
-    .holiday-tag.custom { color: #FF8F00; border-color: #FFCC80; }
-    .holiday-count { font-size: 12px; color: #FF8F00; font-weight: bold; }
-    .holiday-card.past .holiday-count { color: #9E9E9E; }
+    .holiday-month { font-size: 12px; color: var(--muted); }
+    .holiday-day { font-size: 26px; font-weight: bold; color: var(--text); line-height: 1; margin: 4px 0; }
+    .holiday-week { font-size: 12px; color: var(--muted); }
+    .holiday-name { font-size: 13px; font-weight: bold; color: var(--text); margin-bottom: 4px; }
+    .holiday-name.past-name { text-decoration: underline; color: var(--text-light); }
+    .holiday-tag { font-size: 9px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 1px 4px; margin-left: 2px; vertical-align: middle; }
+    .holiday-tag.custom { color: var(--primary-dark); border-color: #FFCC80; }
+    .holiday-count { font-size: 11px; color: var(--primary-dark); font-weight: bold; }
+    .holiday-card.past .holiday-count { color: var(--muted); }
+
+    /* 底部 Tab */
+    .tabbar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; background: var(--card); border-top: 1px solid var(--border);
+      padding: 6px 0 10px; height: 70px;
+    }
+    .tabbar button {
+      flex: 1; background: none; border-radius: 0; box-shadow: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; font-size: 11px; color: var(--muted); font-weight: normal; padding: 4px;
+    }
+    .tabbar button img { width: 26px; height: 26px; object-fit: contain; opacity: .7; }
+    .tabbar button.active { color: var(--primary-dark); font-weight: bold; }
+    .tabbar button.active img { opacity: 1; }
   </style>
 </head>
 <body>
-  <!-- 记录页（老师用） -->
-  <div id="page-record" class="page active">
+  <div class="app-header">
+    <div class="app-title">欢迎来到家园沟通站<small id="header-date">8月25日 星期二</small></div>
+    <div class="app-status">本地存储 · 实时保存</div>
+  </div>
+
+  <!-- 首页 -->
+  <div id="page-home" class="page active">
+    <div class="card hero-card">
+      <div class="hero-top">
+        <div>
+          <div class="greeting" id="greeting">晚上好，赵老师</div>
+          <div class="hero-time" id="hero-time">16:20</div>
+          <div class="hero-date" id="hero-date">2026年8月25日 · 星期二</div>
+        </div>
+        <img src="icons/mascot.png" class="hero-mascot" alt="吉祥物">
+      </div>
+      <div class="quick-actions">
+        <button class="quick-btn" onclick="goTab('record')"><img src="icons/eat.png"><span>去记录</span></button>
+        <button class="quick-btn" onclick="goTab('report')"><img src="icons/work.png"><span>写周报</span></button>
+        <button class="quick-btn" onclick="goTab('kids')"><img src="icons/sport.png"><span>看孩子</span></button>
+        <button class="quick-btn" onclick="goTab('report')" style="background:#FFF3E0;"><img src="icons/flower.png"><span>AI润色</span></button>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-records">0</div><div class="stat-label">今日记录</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-kids">0</div><div class="stat-label">孩子总数</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-holiday">--</div><div class="stat-label" id="stat-holiday-label">最近节日</div></div>
+    </div>
+    <div class="card tip-card">
+      <div class="tip-title">⭐ 今日小提示</div>
+      <div class="tip-text" id="daily-tip">给重要的家长发一条孩子进步的反馈吧，就现在。</div>
+    </div>
+  </div>
+
+  <!-- 记录页 -->
+  <div id="page-record" class="page">
     <div class="class-bar"></div>
     <div class="card">
       <h3>📝 新记录</h3>
-      <label style="font-size:13px;color:#A1887F">选择幼儿（可多选）</label>
+      <label style="font-size:13px;color:var(--muted)">选择幼儿（可多选）</label>
       <div id="r-child-list" class="child-checks"></div>
       <select id="r-area">
         <option>建构区</option><option>美工区</option><option>角色区</option>
         <option>益智区</option><option>阅读区</option><option>科学区</option>
       </select>
       <textarea id="r-text" rows="4" placeholder="孩子说了什么？做了什么？"></textarea>
-      <label style="font-size:13px;color:#A1887F">插入图片（最多3张，自动压缩）</label>
+      <label style="font-size:13px;color:var(--muted)">插入图片（最多3张，自动压缩）</label>
       <div class="img-preview" id="r-img-preview">
         <label class="img-upload-btn" for="r-img">+</label>
       </div>
       <input type="file" id="r-img" accept="image/*" multiple style="display:none" onchange="previewImages(this)">
       <div id="r-edit-actions" style="display:none; gap:8px; margin-bottom:10px;">
-        <button onclick="deleteRecord()" style="background:#FF5252; color:#fff; margin-bottom:8px;">🗑 删除记录</button>
-        <button onclick="cancelEdit()" style="background:#E0E0E0; color:#5D4037;">取消编辑</button>
+        <button onclick="deleteRecord()" class="danger" style="margin-bottom:8px;">🗑 删除记录</button>
+        <button onclick="cancelEdit()" class="secondary">取消编辑</button>
       </div>
       <button id="r-save-btn" onclick="saveRecord()">保存记录</button>
     </div>
     <div id="record-list"></div>
   </div>
+
   <!-- 周报页 -->
   <div id="page-report" class="page">
     <div class="class-bar"></div>
@@ -123,11 +234,12 @@
       <select id="w-child"></select>
       <button onclick="genReport()">生成周报文字</button>
       <div id="w-out" class="report-output" contenteditable="false"></div>
-      <button onclick="exportReportImage()">🖼 导出周报图片</button>
-      <button onclick="polishReport()">✨ AI 润色</button>
-      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">点击「导出周报图片」可把文字和照片合成一张图片，保存后直接发给家长。</p>
+      <button onclick="exportReportImage()" class="secondary">🖼 导出周报图片</button>
+      <button onclick="polishReport()" style="margin-top:10px;background:#FFF3E0;color:#8D6E63;">✨ AI 润色</button>
+      <p style="font-size:12px;color:var(--muted);margin:10px 0 0">点击「导出周报图片」可把文字和照片合成一张图片，保存后直接发给家长。</p>
     </div>
   </div>
+
   <!-- 孩子管理页 -->
   <div id="page-kids" class="page">
     <div class="class-bar"></div>
@@ -148,13 +260,14 @@
     </div>
     <div class="card">
       <h3>📥 批量导入</h3>
-      <button onclick="downloadChildTemplate()">下载 CSV 模板</button>
-      <p style="font-size:12px;color:#A1887F;margin:8px 0 8px">用 Excel / WPS 打开模板填写，保存后再点下面导入。</p>
+      <button onclick="downloadChildTemplate()" class="secondary">下载 CSV 模板</button>
+      <p style="font-size:12px;color:var(--muted);margin:10px 0 10px">用 Excel / WPS 打开模板填写，保存后再点下面导入。</p>
       <input type="file" id="k-import" accept=".csv" style="display:none" onchange="importChildren(this)">
       <button onclick="document.getElementById('k-import').click()">导入 CSV 文件</button>
     </div>
     <div id="kid-list"></div>
   </div>
+
   <!-- 设置页 -->
   <div id="page-settings" class="page">
     <div class="card">
@@ -164,7 +277,7 @@
         <input id="new-class-name" placeholder="新班级名称" style="flex:1;margin:0;">
         <button onclick="addClass(document.getElementById('new-class-name').value)" style="width:auto;flex:0;padding:8px 14px;">添加</button>
       </div>
-      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
     </div>
     <div class="card">
       <h3>🎉 节假日倒计时</h3>
@@ -177,7 +290,7 @@
       <button onclick="addHoliday()">添加节假日</button>
       <h4 style="margin:16px 0 8px;font-size:14px;">我的自定义节假日</h4>
       <div id="custom-holiday-list"></div>
-      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">内置节假日为 2026 年示例日期，可用上方自定义节假日覆盖/补充。</p>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0">内置节假日为 2026 年示例日期，可用上方自定义节假日覆盖/补充。</p>
     </div>
     <div class="card">
       <h3>⚙️ AI 设置</h3>
@@ -187,31 +300,31 @@
     </div>
     <div class="card">
       <h3>💾 数据备份</h3>
-      <button onclick="exportBackup()">导出备份（JSON）</button>
-      <p style="font-size:12px;color:#A1887F;margin:8px 0 0">建议每周导出一次，防止换手机/清数据丢失。</p>
+      <button onclick="exportBackup()" class="secondary">导出备份（JSON）</button>
+      <p style="font-size:12px;color:var(--muted);margin:10px 0 0">建议每周导出一次，防止换手机/清数据丢失。</p>
     </div>
   </div>
+
   <!-- 底部Tab -->
   <div class="tabbar">
-    <button class="active" onclick="switchTab('record', this)">📝 记录</button>
-    <button onclick="switchTab('report', this)">📊 周报</button>
-    <button onclick="switchTab('kids', this)">👶 孩子</button>
-    <button onclick="switchTab('settings', this)">⚙️ 设置</button>
+    <button class="active" onclick="switchTab('home', this)"><img src="icons/mascot.png"><span>首页</span></button>
+    <button onclick="switchTab('record', this)"><img src="icons/eat.png"><span>记录</span></button>
+    <button onclick="switchTab('report', this)"><img src="icons/work.png"><span>周报</span></button>
+    <button onclick="switchTab('kids', this)"><img src="icons/sport.png"><span>孩子</span></button>
+    <button onclick="switchTab('settings', this)"><img src="icons/briefcase.png"><span>设置</span></button>
   </div>
+
   <script>
     /* ============ B1-3：注册 Service Worker（仅 http(s) 下生效） ============ */
-    // 本地双击 file:// 打开时跳过注册，避免报错，功能仍可正常使用
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       navigator.serviceWorker.register('./sw.js')
     }
 
-    /* ============ B2 数据层：localStorage 存取（整个数据库就一个对象读写） ============ */
-    // 统一数据仓库：所有数据都在这一个key下
+    /* ============ B2 数据层：localStorage 存取 ============ */
     const STORE_KEY = 'jiayuan-data'
     function load() {
       try {
         let db = JSON.parse(localStorage.getItem(STORE_KEY))
-        // 兼容旧数据（无班级概念）：迁移为「默认班级」
         if (!db || !Array.isArray(db.classes)) {
           const oldChildren = (db && db.children) || []
           const oldRecords = (db && db.records) || []
@@ -233,14 +346,12 @@
             holidays: []
           }
         }
-        // 确保每个班级的孩子都兼容旧手机号格式
         db.classes.forEach(cls => {
           (cls.children || []).forEach(c => {
             if (c.parentPhone && !c.parentPhones) c.parentPhones = [c.parentPhone]
             if (!c.parentPhones) c.parentPhones = []
           })
         })
-        // 默认选中第一个班级
         if (!db.currentClassId || !db.classes.find(c => c.id === db.currentClassId)) {
           db.currentClassId = db.classes[0].id
         }
@@ -249,7 +360,6 @@
       catch (e) { return { classes: [{ id: 'class-' + Date.now(), name: '默认班级', children: [], records: [] }], currentClassId: null, holidays: [] } }
     }
     function save(db) { localStorage.setItem(STORE_KEY, JSON.stringify(db)) }
-    // 当前班级快捷访问
     function getCurrentClass() {
       const db = load()
       return db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
@@ -291,7 +401,46 @@
       save(db)
       renderAll()
     }
-    // ---- 孩子 ----
+
+    /* ============ 首页 ============ */
+    const TIPS = [
+      '给重要的家长发一条孩子进步的反馈吧，就现在。',
+      '今天哪个孩子让你印象最深刻？记下来吧。',
+      '孩子的成长藏在细节里，别忘了拍照留念。',
+      '每周一篇周报，让家长看见孩子的变化。',
+      '表扬要具体，比如"你今天主动分享了玩具"。'
+    ]
+    function updateHeroTime() {
+      const now = new Date()
+      const hours = now.getHours()
+      const greet = hours < 6 ? '夜深了' : hours < 9 ? '早上好' : hours < 12 ? '上午好' : hours < 14 ? '中午好' : hours < 18 ? '下午好' : '晚上好'
+      document.getElementById('greeting').textContent = greet + '，赵老师'
+      document.getElementById('hero-time').textContent = String(hours).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')
+      document.getElementById('hero-date').textContent = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 · ' + ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]
+      document.getElementById('header-date').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]
+    }
+    function updateHomeStats() {
+      const cls = getCurrentClass()
+      const today = new Date().toISOString().slice(0, 10)
+      const todayRecords = (cls.records || []).filter(r => r.date === today).length
+      document.getElementById('stat-records').textContent = todayRecords
+      document.getElementById('stat-kids').textContent = (cls.children || []).length
+      const all = getAllHolidays()
+      const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(a.date))
+      if (future.length) {
+        const h = future[0]
+        const d = daysUntil(h.date)
+        document.getElementById('stat-holiday').textContent = (d === 0 ? '今天' : d + '天')
+        document.getElementById('stat-holiday-label').textContent = h.name
+      } else {
+        document.getElementById('stat-holiday').textContent = '--'
+        document.getElementById('stat-holiday-label').textContent = '最近节日'
+      }
+      const idx = today.split('-').reduce((a, c) => a + parseInt(c), 0) % TIPS.length
+      document.getElementById('daily-tip').textContent = TIPS[idx]
+    }
+
+    /* ============ 孩子 ============ */
     function addChild() {
       const name = document.getElementById('k-name').value.trim()
       if (!name) return alert('请输入姓名')
@@ -310,7 +459,6 @@
         createdAt: new Date().toISOString()
       })
       save(load())
-      // 清空表单
       document.getElementById('k-name').value = ''
       document.getElementById('k-gender').value = ''
       document.getElementById('k-birthday').value = ''
@@ -320,15 +468,15 @@
       document.getElementById('k-note').value = ''
       renderAll()
     }
-    // 仿写提示：删孩子 = db.children.filter(c => c.id !== id)，参考此模式写
-    // ---- 图片压缩与预览 ----
+
+    /* ============ 图片压缩与预览 ============ */
     let pendingImages = []
     let editingRecordId = null
     function renderImagePreview() {
       const preview = document.getElementById('r-img-preview')
       preview.innerHTML = pendingImages.map((img, idx) => `
         <div style="position:relative;width:72px;height:72px;">
-          <img src="${img}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #E0C97F;">
+          <img src="${img}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--border);">
           <span onclick="removePendingImage(${idx})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;background:#FF5252;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">×</span>
         </div>
       `).join('') + '<label class="img-upload-btn" for="r-img">+</label>'
@@ -373,7 +521,8 @@
         })
         .catch(() => alert('图片处理失败，请重试'))
     }
-    // ---- 记录 ----
+
+    /* ============ 记录 ============ */
     function saveRecord() {
       const checked = [...document.querySelectorAll('input[name="r-child"]:checked')]
       if (checked.length === 0) return alert('请至少选择一名幼儿')
@@ -402,16 +551,13 @@
       const r = cls.records.find(x => x.id === id)
       if (!r) return
       editingRecordId = id
-      // 回填幼儿多选
       document.querySelectorAll('input[name="r-child"]').forEach(cb => {
         cb.checked = (r.childIds || []).includes(cb.value)
       })
       document.getElementById('r-area').value = r.area || '建构区'
       document.getElementById('r-text').value = r.text || ''
-      // 回填图片
       pendingImages = (r.images || []).slice()
       renderImagePreview()
-      // 切换编辑模式
       document.getElementById('r-edit-actions').style.display = 'block'
       document.getElementById('r-save-btn').textContent = '更新记录'
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -435,25 +581,28 @@
       renderAll()
       alert('已删除 ✅')
     }
-    // ---- 渲染（页面打开和每次改动后都调用）----
+
+    /* ============ 渲染 ============ */
     function renderAll() {
       const db = load()
       const cls = getCurrentClass()
       const children = cls.children || []
       const records = cls.records || []
-      // 顶部班级选择器（记录页/孩子页/周报页）
+      updateHeroTime()
+      updateHomeStats()
+      // 顶部班级选择器
       document.querySelectorAll('.class-bar').forEach(bar => {
         bar.innerHTML = `
-          <span style="font-size:13px;color:#A1887F">当前班级</span>
+          <span style="font-size:13px;color:var(--muted)">当前班级</span>
           <select onchange="setCurrentClass(this.value)" style="margin:0;flex:1;min-width:120px;">
             ${db.classes.map(c => `<option value="${c.id}" ${c.id === db.currentClassId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
           </select>
         `
       })
-      // 渲染幼儿多选列表
+      // 幼儿多选
       const rChildList = document.getElementById('r-child-list')
       if (children.length === 0) {
-        rChildList.innerHTML = '<div style="color:#A1887F;font-size:13px">（当前班级还没有孩子）</div>'
+        rChildList.innerHTML = '<div style="color:var(--muted);font-size:13px">（当前班级还没有孩子）</div>'
       } else {
         rChildList.innerHTML = children.map(c => `
           <label class="child-check">
@@ -462,39 +611,37 @@
           </label>
         `).join('')
       }
-      // 填充周报下拉框
+      // 周报下拉
       const opts = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
       document.getElementById('w-child').innerHTML = opts || '<option value="">（当前班级还没有孩子）</option>'
-      // 今日记录列表
+      // 今日记录
       const today = new Date().toISOString().slice(0, 10)
       document.getElementById('record-list').innerHTML = records
         .filter(r => r.date === today)
-        .map(r => `<div class="card"><b>${(r.childNames || ['未知']).join('、')}</b> · ${r.area}<br>${r.text}
-               ${(r.images || []).map(img => `<img src="${img}" style="max-width:100%;border-radius:8px;margin-top:8px;display:block;">`).join('')}
+        .map(r => `<div class="card record-card"><b>${(r.childNames || ['未知']).join('、')}</b> · ${r.area}<br>${r.text}
+               ${(r.images || []).map(img => `<img src="${img}" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;">`).join('')}
                <div style="display:flex;gap:8px;margin-top:10px;">
                  <button onclick="editRecord('${r.id}')" style="flex:1;width:auto;background:#FFE082;">✏️ 编辑</button>
                </div>
-               <div style="color:#A1887F;font-size:12px;margin-top:6px">${r.date}</div></div>`)
+               <div style="color:var(--muted);font-size:12px;margin-top:6px">${r.date}</div></div>`)
         .reverse().join('') || '<div class="card">今天还没有记录</div>'
       // 孩子列表
       document.getElementById('kid-list').innerHTML = children
-        .map(c => `<div class="card" onclick="toggleKidDetail('${c.id}')" style="cursor:pointer;">
+        .map(c => `<div class="card kid-card" onclick="toggleKidDetail('${c.id}')">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>${c.name}</b>
-            <span style="font-size:12px;color:#A1887F">${(c.parentPhones || []).join(' / ')}</span>
+            <span style="font-size:12px;color:var(--muted)">${(c.parentPhones || []).join(' / ')}</span>
           </div>
-          <div id="kid-detail-${c.id}" style="display:none;margin-top:8px;font-size:13px;color:#5D4037;line-height:1.6;">
+          <div id="kid-detail-${c.id}" style="display:none;margin-top:8px;font-size:13px;color:var(--text);line-height:1.6;">
             ${c.gender ? '性别：' + escapeHtml(c.gender) + '<br>' : ''}
             ${c.birthday ? '生日：' + escapeHtml(c.birthday) + '<br>' : ''}
             ${c.idCard ? '身份证：' + escapeHtml(c.idCard) + '<br>' : ''}
             ${c.parentName ? '家长姓名：' + escapeHtml(c.parentName) + '<br>' : ''}
-            ${((c.parentPhones || []).length) ? '家长手机号：' + c.parentPhones.map(p => `<a href="tel:${escapeHtml(p)}">${escapeHtml(p)}</a>`).join('、') + '<br>' : ''}
+            ${((c.parentPhones || []).length) ? '家长手机号：' + c.parentPhones.map(p => `<a href="tel:${escapeHtml(p)}" style="color:var(--primary-dark)">${escapeHtml(p)}</a>`).join('、') + '<br>' : ''}
             ${c.note ? '备注：' + escapeHtml(c.note) : ''}
           </div>
         </div>`).join('') || ''
-      // 设置页班级管理
       renderClassSettings()
-      // 设置页节假日倒计时
       renderHolidays()
     }
     function toggleKidDetail(id) {
@@ -502,22 +649,21 @@
       if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'
     }
 
-    /* ============ 班级管理：设置页渲染与操作 ============ */
+    /* ============ 班级管理 ============ */
     function renderClassSettings() {
       const db = load()
       const list = document.getElementById('class-list')
       if (!list) return
       list.innerHTML = db.classes.map(c => `
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-          <input value="${escapeHtml(c.name)}" onchange="renameClass('${c.id}', this.value)"
-                 style="flex:1;margin:0;">
-          ${c.id === db.currentClassId ? '<span style="font-size:12px;color:#FF8F00">当前</span>' : '<span style="font-size:12px;color:#A1887F">切换</span>'}
-          <button onclick="deleteClass('${c.id}')" style="width:auto;flex:0;background:#FF5252;color:#fff;padding:8px 12px;">删除</button>
+          <input value="${escapeHtml(c.name)}" onchange="renameClass('${c.id}', this.value)" style="flex:1;margin:0;">
+          ${c.id === db.currentClassId ? '<span style="font-size:12px;color:var(--primary-dark)">当前</span>' : '<span style="font-size:12px;color:var(--muted)">切换</span>'}
+          <button onclick="deleteClass('${c.id}')" class="danger" style="width:auto;flex:0;padding:8px 12px;">删除</button>
         </div>
       `).join('')
     }
 
-    /* ============ 节假日倒计时（内置 + 自定义） ============ */
+    /* ============ 节假日倒计时 ============ */
     const BUILTIN_HOLIDAYS = {
       '元旦': '2026-01-01',
       '春节': '2026-02-17',
@@ -527,7 +673,6 @@
       '中秋节': '2026-09-25',
       '国庆节': '2026-10-01'
     }
-    // 内置节假日每年日期会变化，这里用 2026 年示例；用户可在设置页用自定义节假日覆盖/补充
     function getAllHolidays() {
       const db = load()
       const customs = db.holidays || []
@@ -539,22 +684,18 @@
       const target = new Date(dateStr + 'T00:00:00')
       const now = new Date()
       now.setHours(0, 0, 0, 0)
-      const diff = Math.ceil((target - now) / 86400000)
-      return diff
+      return Math.ceil((target - now) / 86400000)
     }
     function formatWeekday(dateStr) {
-      const map = ['周日','周一','周二','周三','周四','周五','周六']
-      return map[new Date(dateStr + 'T00:00:00').getDay()]
+      return ['周日','周一','周二','周三','周四','周五','周六'][new Date(dateStr + 'T00:00:00').getDay()]
     }
     function renderHolidays() {
       const listEl = document.getElementById('holiday-list')
       const customEl = document.getElementById('custom-holiday-list')
       if (!listEl) return
       const all = getAllHolidays()
-      // 排序：未来在前（按天数升序），已过的在后（按天数降序）
       const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
       const past = all.filter(h => daysUntil(h.date) < 0).sort((a, b) => daysUntil(b.date) - daysUntil(a.date))
-
       listEl.innerHTML = '<div class="holiday-grid">' + future.concat(past).map(h => {
         const d = daysUntil(h.date)
         const date = new Date(h.date + 'T00:00:00')
@@ -579,16 +720,14 @@
           </div>
         `
       }).join('') + '</div>'
-
-      // 自定义列表（可删除）
       if (customEl) {
         const customs = (load().holidays || [])
         customEl.innerHTML = customs.map((h, idx) => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF3E0;">
             <span style="font-size:14px;">${escapeHtml(h.name)} · ${h.date}</span>
-            <button onclick="deleteHoliday(${idx})" style="width:auto;flex:0;background:#FF5252;color:#fff;padding:6px 10px;">删除</button>
+            <button onclick="deleteHoliday(${idx})" class="danger" style="width:auto;flex:0;padding:6px 10px;">删除</button>
           </div>
-        `).join('') || '<div style="font-size:13px;color:#A1887F">还没有自定义节假日</div>'
+        `).join('') || '<div style="font-size:13px;color:var(--muted)">还没有自定义节假日</div>'
       }
     }
     function addHoliday() {
@@ -602,6 +741,7 @@
       document.getElementById('h-name').value = ''
       document.getElementById('h-date').value = ''
       renderHolidays()
+      updateHomeStats()
       alert('已添加 ✅')
     }
     function deleteHoliday(idx) {
@@ -610,8 +750,10 @@
       db.holidays.splice(idx, 1)
       save(db)
       renderHolidays()
+      updateHomeStats()
     }
 
+    /* ============ CSV 导入 ============ */
     function downloadChildTemplate() {
       const header = '姓名,性别,生日,身份证号,家长姓名,家长手机号,备注\n'
       const sample = '张三,男,2019-05-12,310XXXXXXXXXXXXX,张爸爸,13800138000 13900139000,活泼好动\n'
@@ -675,50 +817,42 @@
       cols.push(cur)
       return cols
     }
-    // 解析手机号：支持多个，空格/逗号/分号/中文逗号分隔；空返回 []，含非法返回 null
     function parsePhones(raw) {
       const list = String(raw).split(/[，,；;\s]+/).map(s => s.trim()).filter(Boolean)
       if (list.length === 0) return []
       for (const p of list) if (!/^\d{11}$/.test(p)) return null
       return list
     }
-    renderAll()
 
-    /* ============ B3 周报生成：模板拼装（免费核心功能） ============ */
-    // 当前周报里的图片，AI 润色时只换文字、保留图片
+    /* ============ 周报生成 ============ */
     let currentReportImages = []
     function escapeHtml(text) {
       return text.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
     }
     function renderReport(text, images) {
       const imageHtml = (images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
-      const html = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
-                   (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
-      document.getElementById('w-out').innerHTML = html
+      document.getElementById('w-out').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
     }
     function genReport() {
       const cls = getCurrentClass()
       const childSel = document.getElementById('w-child')
       const childId = childSel.value
       if (!childId) return alert('当前班级还没有孩子')
-      // 1. 取该孩子最近7天的记录（支持多名幼儿的记录）
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
       const records = cls.records.filter(r => ((r.childIds) || []).includes(childId) && r.date >= weekAgo)
       if (records.length === 0) return alert('这个孩子最近7天还没有记录')
       const childName = childSel.options[childSel.selectedIndex].text
-      // 2. 按区域分组统计
       const byArea = {}
       records.forEach(r => { (byArea[r.area] = byArea[r.area] || []).push(r) })
       const areaLines = Object.entries(byArea)
         .sort((a, b) => b[1].length - a[1].length)
         .map(([area, rs]) => {
-          const quote = rs[rs.length - 1].text.slice(0, 50)   // 抽最近一条做代表
+          const quote = rs[rs.length - 1].text.slice(0, 50)
           return `【${area}】本周参与 ${rs.length} 次。代表性表现：「${quote}…」`
         })
-      // 3. 拼装周报文字
       const today = new Date().toISOString().slice(0, 10)
       const reportText = `🌟 ${childName} 本周成长周报（${weekAgo} ~ ${today}）\n本周共记录 ${records.length} 个精彩瞬间：\n\n${areaLines.join('\n\n')}\n\n💡 老师的话：________________\n\n如想了解更多细节，欢迎和老师交流～`
-      // 4. 收集该幼儿相关记录的图片（去重，最多6张）
       const images = []
       records.forEach(r => {
         (r.images || []).forEach(img => { if (!images.includes(img)) images.push(img) })
@@ -726,22 +860,19 @@
       currentReportImages = images
       renderReport(reportText, images)
     }
-    // 导出周报为图片：把文字和图片记录合成一张 PNG（纯 canvas，离线可用）
     function exportReportImage() {
       if (!currentReportImages.length && !document.getElementById('w-out').innerText.trim())
         return alert('请先生成周报')
-      const scale = 2            // 高清倍数
-      const maxWidth = 600       // 内容区宽度
+      const scale = 2
+      const maxWidth = 600
       const padding = 24
       const lineHeight = 24
       const fontSize = 16
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       ctx.font = fontSize + 'px sans-serif'
-      // 1. 文字换行
       const textLines = wrapText(ctx, document.getElementById('w-out').innerText, maxWidth)
       const textHeight = textLines.length * lineHeight
-      // 2. 图片布局（每行2张）
       const imgSize = (maxWidth - 8) / 2
       const imgGap = 8
       const imgRows = Math.ceil(currentReportImages.length / 2)
@@ -752,16 +883,13 @@
       canvas.width = totalW * scale
       canvas.height = totalH * scale
       ctx.scale(scale, scale)
-      // 3. 背景
       ctx.fillStyle = '#FFFDF5'
       ctx.fillRect(0, 0, totalW, totalH)
-      // 4. 文字
       ctx.fillStyle = '#5D4037'
       ctx.font = fontSize + 'px sans-serif'
       ctx.textBaseline = 'top'
       let y = padding
       textLines.forEach(line => { ctx.fillText(line, padding, y); y += lineHeight })
-      // 5. 图片
       if (currentReportImages.length > 0) {
         y += 12
         let pending = currentReportImages.length
@@ -810,8 +938,7 @@
       return lines
     }
 
-    /* ============ 补充功能：设置 / 导出备份 / AI 润色（手册 B2/B3 可选项） ============ */
-    // 密钥存 localStorage，不写死在代码里（手册要求）
+    /* ============ 设置 / 备份 / AI 润色 ============ */
     function saveKey() {
       const key = document.getElementById('s-key').value.trim()
       if (!key) return alert('请输入密钥')
@@ -821,7 +948,6 @@
     function getKey() {
       return localStorage.getItem('jiayuan-deepseek-key') || ''
     }
-    // 导出备份：把 load() 返回的数据下载成 JSON 文件（手册要求的"通用技能10行"）
     function exportBackup() {
       const db = load()
       const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' })
@@ -833,7 +959,6 @@
       URL.revokeObjectURL(url)
       alert('已导出备份文件 ✅')
     }
-    // AI 润色：把当前周报文字发给 DeepSeek；失败则回退模板版（手册要求）
     async function polishReport() {
       const apiKey = getKey()
       if (!apiKey) return alert('请先在「设置」里填写 DeepSeek API Key')
@@ -863,7 +988,7 @@
         renderReport(polished, currentReportImages)
         alert('AI 润色完成 ✨')
       } catch (e) {
-        alert('AI 润色失败（' + e.message + '），已保留原有模板文字。如要稳定用 AI，建议升级方式A。')
+        alert('AI 润色失败（' + e.message + '），已保留原有模板文字。')
       }
     }
 
@@ -873,7 +998,17 @@
       document.getElementById('page-' + name).classList.add('active')
       document.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('active'))
       btn.classList.add('active')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
+    function goTab(name) {
+      const btns = document.querySelectorAll('.tabbar button')
+      const map = { home: 0, record: 1, report: 2, kids: 3, settings: 4 }
+      const idx = map[name]
+      if (btns[idx]) switchTab(name, btns[idx])
+    }
+
+    renderAll()
+    setInterval(updateHeroTime, 30000)
   </script>
 </body>
 </html>
