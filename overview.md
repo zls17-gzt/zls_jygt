@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v14**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v16**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -20,13 +20,16 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - **永久网址**：https://zls17-gzt.github.io/zls_jygt/ （实测可访问，title=家园沟通站）
 - **后续更新**：修改代码后，把 `sw.js` 的 `CACHE_NAME` 升一版（如 v13），再 `git push` 即可；手机端关掉重开生效。
 
-## 本次改动（v14 · 月历每日笔记)
+## 本次改动（v16 · 设置页移除节假日倒计时）
 
-- 月历每个日期格支持**双击编辑**：弹出当天详情弹窗，可填写「今天的待办 / 做了什么」。
-- 弹窗内容：日期标题 + 当天成长记录列表（如有）+ 笔记 textarea + 保存/关闭按钮 + 跳转「记录」页入口。
-- 单击日期格也会打开同一弹窗（移动端友好）；双击则自动聚焦笔记输入框。
-- 已写笔记的日期在月历上显示**蓝色小圆点**标记；数据为全站共享（存 localStorage `jiayuan-daynotes`），不随班级切换而变化。
-- `sw.js` 升级到 v14。
+- 设置页里的**「节假日倒计时」卡片已删除**，不再展示内置节假日的倒计时网格。
+- **自定义节假日管理保留**：仍可添加、删除自己的节假日；自定义节假日继续用于月历粉点标记和首页「最近节日」统计。
+- 同步清理了仅用于倒计时的 `.holiday-grid` / `.holiday-card` 等 CSS。
+- `sw.js` 升级到 v16。
+
+> 之前 v15 的改动：月历已写笔记的日期格半透明并直接显示编辑文字。
+
+> 之前 v14 的改动：月历每个日期格支持双击编辑、填写「今天的待办 / 做了什么」，数据存 localStorage `jiayuan-daynotes`，全站共享。
 
 > 之前 v11/v12/v13 的改动：奶油黄可爱风格首页、吉祥物大卡片、统计概览、卡通图标、左侧边栏导航、月历组件等已全部保留。
 
@@ -35,7 +38,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（左侧边栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v14） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v16） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |

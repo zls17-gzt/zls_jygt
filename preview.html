@@ -216,21 +216,6 @@
     .record-card, .kid-card { cursor: pointer; }
     .record-card img, .kid-card img { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
 
-    /* 节假日倒计时 */
-    .holiday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
-    .holiday-card { background: var(--card-soft); border: 1px solid var(--border); border-radius: 16px; padding: 12px 6px; text-align: center; }
-    .holiday-card.today { background: var(--primary); border-color: var(--primary-dark); }
-    .holiday-card.past { background: #F5F5F5; border-color: #E0E0E0; opacity: .85; }
-    .holiday-date { display: flex; flex-direction: column; align-items: center; margin-bottom: 6px; }
-    .holiday-month { font-size: 12px; color: var(--muted); }
-    .holiday-day { font-size: 26px; font-weight: bold; color: var(--text); line-height: 1; margin: 4px 0; }
-    .holiday-week { font-size: 12px; color: var(--muted); }
-    .holiday-name { font-size: 13px; font-weight: bold; color: var(--text); margin-bottom: 4px; }
-    .holiday-name.past-name { text-decoration: underline; color: var(--text-light); }
-    .holiday-tag { font-size: 9px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 1px 4px; margin-left: 2px; vertical-align: middle; }
-    .holiday-tag.custom { color: var(--primary-dark); border-color: #FFCC80; }
-    .holiday-count { font-size: 11px; color: var(--primary-dark); font-weight: bold; }
-    .holiday-card.past .holiday-count { color: var(--muted); }
 
     /* 左侧边栏导航 */
     .tabbar {
@@ -388,8 +373,7 @@
       <p style="font-size:12px;color:var(--muted);margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
     </div>
     <div class="card">
-      <h3>🎉 节假日倒计时</h3>
-      <div id="holiday-list"></div>
+      <h3>🎉 自定义节假日</h3>
       <h4 style="margin:16px 0 8px;font-size:14px;">添加自定义节假日</h4>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
         <input id="h-name" placeholder="名称，如：春游" style="flex:1;margin:0;">
@@ -879,7 +863,7 @@
       `).join('')
     }
 
-    /* ============ 节假日倒计时 ============ */
+    /* ============ 节假日管理 ============ */
     const BUILTIN_HOLIDAYS = {
       '元旦': '2026-01-01',
       '春节': '2026-02-17',
@@ -908,34 +892,36 @@
     function renderHolidays() {
       const listEl = document.getElementById('holiday-list')
       const customEl = document.getElementById('custom-holiday-list')
-      if (!listEl) return
-      const all = getAllHolidays()
-      const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
-      const past = all.filter(h => daysUntil(h.date) < 0).sort((a, b) => daysUntil(b.date) - daysUntil(a.date))
-      listEl.innerHTML = '<div class="holiday-grid">' + future.concat(past).map(h => {
-        const d = daysUntil(h.date)
-        const date = new Date(h.date + 'T00:00:00')
-        const isPast = d < 0
-        const isToday = d === 0
-        const tagClass = h.builtin ? '' : 'custom'
-        const tagText = h.builtin ? '内置' : '自定义'
-        return `
-          <div class="holiday-card ${isPast ? 'past' : ''} ${isToday ? 'today' : ''}">
-            <div class="holiday-date">
-              <span class="holiday-month">${date.getMonth() + 1}月</span>
-              <span class="holiday-day">${date.getDate()}</span>
-              <span class="holiday-week">${formatWeekday(h.date)}</span>
+      if (!listEl && !customEl) return
+      if (listEl) {
+        const all = getAllHolidays()
+        const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
+        const past = all.filter(h => daysUntil(h.date) < 0).sort((a, b) => daysUntil(b.date) - daysUntil(a.date))
+        listEl.innerHTML = '<div class="holiday-grid">' + future.concat(past).map(h => {
+          const d = daysUntil(h.date)
+          const date = new Date(h.date + 'T00:00:00')
+          const isPast = d < 0
+          const isToday = d === 0
+          const tagClass = h.builtin ? '' : 'custom'
+          const tagText = h.builtin ? '内置' : '自定义'
+          return `
+            <div class="holiday-card ${isPast ? 'past' : ''} ${isToday ? 'today' : ''}">
+              <div class="holiday-date">
+                <span class="holiday-month">${date.getMonth() + 1}月</span>
+                <span class="holiday-day">${date.getDate()}</span>
+                <span class="holiday-week">${formatWeekday(h.date)}</span>
+              </div>
+              <div class="holiday-name ${isPast ? 'past-name' : ''}">
+                ${escapeHtml(h.name)}
+                <span class="holiday-tag ${tagClass}">${tagText}</span>
+              </div>
+              <div class="holiday-count">
+                ${isToday ? '🎉 今天' : (isPast ? '已过 ' + Math.abs(d) + ' 天' : '还有 ' + d + ' 天')}
+              </div>
             </div>
-            <div class="holiday-name ${isPast ? 'past-name' : ''}">
-              ${escapeHtml(h.name)}
-              <span class="holiday-tag ${tagClass}">${tagText}</span>
-            </div>
-            <div class="holiday-count">
-              ${isToday ? '🎉 今天' : (isPast ? '已过 ' + Math.abs(d) + ' 天' : '还有 ' + d + ' 天')}
-            </div>
-          </div>
-        `
-      }).join('') + '</div>'
+          `
+        }).join('') + '</div>'
+      }
       if (customEl) {
         const customs = (load().holidays || [])
         customEl.innerHTML = customs.map((h, idx) => `
