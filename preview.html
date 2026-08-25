@@ -137,6 +137,25 @@
     .dot.record-dot { background: var(--primary-dark); }
     .dot.holiday-dot { background: #FF8F80; }
 
+    /* 日期详情弹窗 */
+    .modal-mask {
+      position: fixed; inset: 0; background: rgba(93,64,55,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; padding: 20px;
+    }
+    .modal-box {
+      background: var(--card); border-radius: 20px; padding: 18px;
+      width: 100%; max-width: 380px; box-shadow: var(--shadow);
+    }
+    .modal-title { font-size: 17px; font-weight: bold; color: var(--text); margin-bottom: 12px; }
+    .modal-records { max-height: 160px; overflow-y: auto; margin-bottom: 12px; }
+    .modal-rec-item {
+      background: var(--card-soft); border-radius: 12px; padding: 10px;
+      margin-bottom: 8px; font-size: 14px; color: var(--text-light); line-height: 1.5;
+    }
+    .modal-empty { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .modal-label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+
     /* 顶部班级切换条 */
     .class-bar {
       display: flex; align-items: center; gap: 8px;
@@ -386,6 +405,21 @@
     <button onclick="switchTab('settings', this)"><img src="icons/briefcase.png"><span>设置</span></button>
   </div>
 
+  <!-- 日期详情 / 笔记弹窗 -->
+  <div id="day-modal" class="modal-mask" style="display:none" onclick="if(event.target===this)closeDayModal()">
+    <div class="modal-box">
+      <div class="modal-title" id="day-modal-title">日期</div>
+      <div id="day-modal-records" class="modal-records"></div>
+      <label class="modal-label">📝 今天的待办 / 做了什么</label>
+      <textarea id="day-modal-note" rows="4" placeholder="例如：下午开家长会；完成 3 篇周报；记得给乐乐带药…"></textarea>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button onclick="saveDayNote()" style="flex:1">保存笔记</button>
+        <button onclick="closeDayModal()" class="secondary" style="flex:1">关闭</button>
+      </div>
+      <button onclick="goTab('record');closeDayModal()" style="margin-top:8px;background:#FFF3E0;color:#8D6E63;">➕ 去添加当日记录</button>
+    </div>
+  </div>
+
   <script>
     /* ============ B1-3：注册 Service Worker（仅 http(s) 下生效） ============ */
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -531,6 +565,7 @@
       const cls = getCurrentClass()
       const records = cls.records || []
       const holidays = getAllHolidays()
+      const dayNotes = loadDayNotes()
       const today = new Date().toISOString().slice(0, 10)
       let html = ''
       // 上月补位
@@ -547,8 +582,9 @@
         let marks = ''
         if (hasRecord) marks += '<i class="dot record"></i>'
         if (holiday) marks += '<i class="dot holiday"></i>'
+        if (dayNotes[dateStr]) marks += '<i class="dot note"></i>'
         html += `
-          <div class="calendar-day ${isToday ? 'today' : ''}" onclick="onCalendarDay('${dateStr}')" title="${holiday ? holiday.name : ''}">
+          <div class="calendar-day ${isToday ? 'today' : ''}" onclick="openDayModal('${dateStr}')" ondblclick="openDayModal('${dateStr}', true)" title="${holiday ? holiday.name : ''}">
             <span style="${isWeekend && !isToday ? 'color:#FF8F80' : ''}">${d}</span>
             ${marks ? '<div class="marks">' + marks + '</div>' : ''}
           </div>
@@ -562,19 +598,42 @@
       }
       el.innerHTML = html
     }
-    function onCalendarDay(dateStr) {
+    /* ============ 月历每日笔记 ============ */
+    const DAY_NOTES_KEY = 'jiayuan-daynotes'
+    let currentDayNoteDate = ''
+    function loadDayNotes() {
+      try { return JSON.parse(localStorage.getItem(DAY_NOTES_KEY)) || {} }
+      catch (e) { return {} }
+    }
+    function openDayModal(dateStr, focusNote) {
+      currentDayNoteDate = dateStr
+      document.getElementById('day-modal-title').textContent = dateStr + ' ' + formatWeekday(dateStr)
       const cls = getCurrentClass()
       const records = (cls.records || []).filter(r => r.date === dateStr)
+      const recEl = document.getElementById('day-modal-records')
       if (records.length === 0) {
-        if (confirm(dateStr + ' 还没有记录，现在去添加吗？')) {
-          goTab('record')
-        }
-        return
+        recEl.innerHTML = '<div class="modal-empty">这一天还没有成长记录</div>'
+      } else {
+        recEl.innerHTML = records.map(r =>
+          `<div class="modal-rec-item"><b>${(r.childNames || ['未知']).join('、')}</b> · ${r.area}<br>${escapeHtml(r.text)}</div>`
+        ).join('')
       }
-      const list = records.map(r => {
-        return `• ${(r.childNames || ['未知']).join('、')} · ${r.area}\n  ${r.text}`
-      }).join('\n\n')
-      alert(dateStr + ' 共有 ' + records.length + ' 条记录：\n\n' + list)
+      document.getElementById('day-modal-note').value = loadDayNotes()[dateStr] || ''
+      document.getElementById('day-modal').style.display = 'flex'
+      if (focusNote) setTimeout(() => document.getElementById('day-modal-note').focus(), 50)
+    }
+    function saveDayNote() {
+      const notes = loadDayNotes()
+      const val = document.getElementById('day-modal-note').value.trim()
+      if (val) notes[currentDayNoteDate] = val
+      else delete notes[currentDayNoteDate]
+      localStorage.setItem(DAY_NOTES_KEY, JSON.stringify(notes))
+      closeDayModal()
+      renderCalendar()
+      alert('已保存 ✅')
+    }
+    function closeDayModal() {
+      document.getElementById('day-modal').style.display = 'none'
     }
 
     /* ============ 孩子 ============ */
