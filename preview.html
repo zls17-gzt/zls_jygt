@@ -89,6 +89,54 @@
     .tip-title { font-size: 15px; font-weight: bold; color: var(--text); margin-bottom: 6px; }
     .tip-text { font-size: 14px; color: var(--text-light); line-height: 1.5; }
 
+    /* 月历 */
+    .calendar-card { padding: 14px; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .calendar-header h3 { margin: 0; font-size: 16px; }
+    .calendar-nav { display: flex; align-items: center; gap: 10px; }
+    .calendar-nav button {
+      width: 30px; height: 30px; padding: 0; border-radius: 50%;
+      background: var(--card-soft); color: var(--text-light);
+      box-shadow: none; font-size: 13px; line-height: 30px;
+    }
+    .calendar-nav button:active { background: var(--primary); }
+    #calendar-ym { font-size: 14px; font-weight: bold; color: var(--text); min-width: 92px; text-align: center; }
+    .calendar-weekdays {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+      margin-bottom: 6px; text-align: center;
+    }
+    .calendar-weekdays span { font-size: 12px; color: var(--muted); }
+    .calendar-days {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    }
+    .calendar-day {
+      aspect-ratio: 1; border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--text); background: var(--card-soft);
+      border: 1px solid transparent; cursor: pointer; position: relative;
+      min-height: 42px;
+    }
+    .calendar-day.other { color: var(--muted); background: transparent; }
+    .calendar-day.today { background: var(--primary); border-color: var(--primary-dark); font-weight: bold; }
+    .calendar-day:hover:not(.today) { background: #FFF3E0; border-color: var(--border); }
+    .calendar-day .marks {
+      position: absolute; bottom: 3px; left: 0; right: 0;
+      display: flex; justify-content: center; gap: 2px;
+    }
+    .calendar-day .dot {
+      width: 5px; height: 5px; border-radius: 50%; display: inline-block;
+    }
+    .calendar-day .dot.record { background: var(--primary-dark); }
+    .calendar-day .dot.holiday { background: #FF8F80; }
+    .calendar-legend {
+      display: flex; justify-content: center; gap: 12px; margin-top: 10px;
+      font-size: 11px; color: var(--muted);
+    }
+    .calendar-legend span { display: flex; align-items: center; gap: 4px; }
+    .dot.today-dot { background: var(--primary); }
+    .dot.record-dot { background: var(--primary-dark); }
+    .dot.holiday-dot { background: #FF8F80; }
+
     /* 顶部班级切换条 */
     .class-bar {
       display: flex; align-items: center; gap: 8px;
@@ -192,6 +240,25 @@
         <button class="quick-btn" onclick="goTab('report')"><img src="icons/work.png"><span>写周报</span></button>
         <button class="quick-btn" onclick="goTab('kids')"><img src="icons/sport.png"><span>看孩子</span></button>
         <button class="quick-btn" onclick="goTab('report')" style="background:#FFF3E0;"><img src="icons/flower.png"><span>AI润色</span></button>
+      </div>
+    </div>
+    <div class="card calendar-card">
+      <div class="calendar-header">
+        <h3>📅 月历</h3>
+        <div class="calendar-nav">
+          <button onclick="changeMonth(-1)">◀</button>
+          <span id="calendar-ym">2026年8月</span>
+          <button onclick="changeMonth(1)">▶</button>
+        </div>
+      </div>
+      <div class="calendar-weekdays">
+        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+      </div>
+      <div class="calendar-days" id="calendar-days"></div>
+      <div class="calendar-legend">
+        <span><i class="dot today-dot"></i>今天</span>
+        <span><i class="dot record-dot"></i>有记录</span>
+        <span><i class="dot holiday-dot"></i>节假日</span>
       </div>
     </div>
     <div class="stats-grid">
@@ -445,6 +512,71 @@
       document.getElementById('daily-tip').textContent = TIPS[idx]
     }
 
+    /* ============ 月历 ============ */
+    let calendarDate = new Date()
+    function changeMonth(delta) {
+      calendarDate.setMonth(calendarDate.getMonth() + delta)
+      renderCalendar()
+    }
+    function renderCalendar() {
+      const el = document.getElementById('calendar-days')
+      const ymEl = document.getElementById('calendar-ym')
+      if (!el || !ymEl) return
+      const y = calendarDate.getFullYear()
+      const m = calendarDate.getMonth()
+      ymEl.textContent = y + '年' + (m + 1) + '月'
+      const firstDay = new Date(y, m, 1)
+      const startDay = firstDay.getDay() // 0=周日
+      const daysInMonth = new Date(y, m + 1, 0).getDate()
+      const cls = getCurrentClass()
+      const records = cls.records || []
+      const holidays = getAllHolidays()
+      const today = new Date().toISOString().slice(0, 10)
+      let html = ''
+      // 上月补位
+      const prevMonthLastDay = new Date(y, m, 0).getDate()
+      for (let i = startDay - 1; i >= 0; i--) {
+        html += `<div class="calendar-day other">${prevMonthLastDay - i}</div>`
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+        const isToday = dateStr === today
+        const hasRecord = records.some(r => r.date === dateStr)
+        const holiday = holidays.find(h => h.date === dateStr)
+        const isWeekend = new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6
+        let marks = ''
+        if (hasRecord) marks += '<i class="dot record"></i>'
+        if (holiday) marks += '<i class="dot holiday"></i>'
+        html += `
+          <div class="calendar-day ${isToday ? 'today' : ''}" onclick="onCalendarDay('${dateStr}')" title="${holiday ? holiday.name : ''}">
+            <span style="${isWeekend && !isToday ? 'color:#FF8F80' : ''}">${d}</span>
+            ${marks ? '<div class="marks">' + marks + '</div>' : ''}
+          </div>
+        `
+      }
+      // 下月补位
+      const totalCells = startDay + daysInMonth
+      const nextPad = (7 - (totalCells % 7)) % 7
+      for (let i = 1; i <= nextPad; i++) {
+        html += `<div class="calendar-day other">${i}</div>`
+      }
+      el.innerHTML = html
+    }
+    function onCalendarDay(dateStr) {
+      const cls = getCurrentClass()
+      const records = (cls.records || []).filter(r => r.date === dateStr)
+      if (records.length === 0) {
+        if (confirm(dateStr + ' 还没有记录，现在去添加吗？')) {
+          goTab('record')
+        }
+        return
+      }
+      const list = records.map(r => {
+        return `• ${(r.childNames || ['未知']).join('、')} · ${r.area}\n  ${r.text}`
+      }).join('\n\n')
+      alert(dateStr + ' 共有 ' + records.length + ' 条记录：\n\n' + list)
+    }
+
     /* ============ 孩子 ============ */
     function addChild() {
       const name = document.getElementById('k-name').value.trim()
@@ -595,6 +727,7 @@
       const records = cls.records || []
       updateHeroTime()
       updateHomeStats()
+      renderCalendar()
       // 顶部班级选择器
       document.querySelectorAll('.class-bar').forEach(bar => {
         bar.innerHTML = `
