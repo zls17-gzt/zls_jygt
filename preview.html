@@ -149,20 +149,25 @@
     .holiday-count { font-size: 11px; color: var(--primary-dark); font-weight: bold; }
     .holiday-card.past .holiday-count { color: var(--muted); }
 
-    /* 底部 Tab */
+    /* 左侧边栏导航 */
     .tabbar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      display: flex; background: var(--card); border-top: 1px solid var(--border);
-      padding: 6px 0 10px; height: 70px;
+      position: fixed; top: 0; bottom: 0; left: 0; width: 92px; z-index: 110;
+      display: flex; flex-direction: column; align-items: stretch;
+      background: var(--card); border-right: 1px solid var(--border);
+      padding: 14px 0 20px; overflow-y: auto;
     }
     .tabbar button {
-      flex: 1; background: none; border-radius: 0; box-shadow: none;
+      width: 100%; background: none; border-radius: 0; box-shadow: none;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; font-size: 11px; color: var(--muted); font-weight: normal; padding: 4px;
+      gap: 4px; font-size: 11px; color: var(--muted); font-weight: normal;
+      padding: 10px 4px; border-left: 3px solid transparent;
     }
-    .tabbar button img { width: 26px; height: 26px; object-fit: contain; opacity: .7; }
-    .tabbar button.active { color: var(--primary-dark); font-weight: bold; }
+    .tabbar button img { width: 34px; height: 34px; object-fit: contain; opacity: .7; }
+    .tabbar button.active { color: var(--primary-dark); font-weight: bold; background: #FFF8E1; border-left-color: var(--primary-dark); }
     .tabbar button.active img { opacity: 1; }
+    .app-header { left: 92px; }
+    .page { padding: 86px 16px 16px 108px; }
+    body { padding-bottom: 0; }
   </style>
 </head>
 <body>
@@ -305,7 +310,7 @@
     </div>
   </div>
 
-  <!-- 底部Tab -->
+  <!-- 左侧边栏 -->
   <div class="tabbar">
     <button class="active" onclick="switchTab('home', this)"><img src="icons/mascot.png"><span>首页</span></button>
     <button onclick="switchTab('record', this)"><img src="icons/eat.png"><span>记录</span></button>
