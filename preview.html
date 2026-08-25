@@ -110,19 +110,35 @@
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
     }
     .calendar-day {
-      aspect-ratio: 1; border-radius: 12px;
+      border-radius: 12px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-size: 14px; color: var(--text); background: var(--card-soft);
       border: 1px solid transparent; cursor: pointer; position: relative;
-      min-height: 42px;
+      min-height: 46px; padding: 4px 3px; overflow: hidden;
+    }
+    /* 有笔记的日期：整格半透明，直接显示编辑的文字 */
+    .calendar-day.has-note {
+      background: rgba(255, 179, 71, 0.30);
+      border-color: rgba(255, 179, 71, 0.55);
+      align-items: stretch; justify-content: flex-start; text-align: left;
+    }
+    .calendar-day.has-note.today { background: rgba(255, 179, 71, 0.42); }
+    .calendar-day .daynum { font-weight: 600; line-height: 1.2; }
+    .calendar-day.has-note .daynum { align-self: flex-start; }
+    .calendar-day .note-text {
+      margin-top: 3px; font-size: 10px; line-height: 1.3; color: #5d4037;
+      white-space: pre-wrap; word-break: break-word;
+      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
     }
     .calendar-day.other { color: var(--muted); background: transparent; }
-    .calendar-day.today { background: var(--primary); border-color: var(--primary-dark); font-weight: bold; }
+    .calendar-day.today { background: var(--primary); border-color: var(--primary-dark); }
+    .calendar-day.today .daynum { font-weight: bold; }
     .calendar-day:hover:not(.today) { background: #FFF3E0; border-color: var(--border); }
     .calendar-day .marks {
       position: absolute; bottom: 3px; left: 0; right: 0;
       display: flex; justify-content: center; gap: 2px;
     }
+    .calendar-day .marks.inline { position: static; justify-content: flex-start; margin-top: 4px; gap: 3px; }
     .calendar-day .dot {
       width: 5px; height: 5px; border-radius: 50%; display: inline-block;
     }
@@ -278,6 +294,7 @@
         <span><i class="dot today-dot"></i>今天</span>
         <span><i class="dot record-dot"></i>有记录</span>
         <span><i class="dot holiday-dot"></i>节假日</span>
+        <span><i style="width:12px;height:12px;border-radius:4px;background:rgba(255,179,71,.35);display:inline-block"></i>有笔记</span>
       </div>
     </div>
     <div class="stats-grid">
@@ -579,14 +596,16 @@
         const hasRecord = records.some(r => r.date === dateStr)
         const holiday = holidays.find(h => h.date === dateStr)
         const isWeekend = new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6
+        const noteText = dayNotes[dateStr] || ''
+        const hasNote = !!noteText
         let marks = ''
         if (hasRecord) marks += '<i class="dot record"></i>'
         if (holiday) marks += '<i class="dot holiday"></i>'
-        if (dayNotes[dateStr]) marks += '<i class="dot note"></i>'
         html += `
-          <div class="calendar-day ${isToday ? 'today' : ''}" onclick="openDayModal('${dateStr}')" ondblclick="openDayModal('${dateStr}', true)" title="${holiday ? holiday.name : ''}">
-            <span style="${isWeekend && !isToday ? 'color:#FF8F80' : ''}">${d}</span>
-            ${marks ? '<div class="marks">' + marks + '</div>' : ''}
+          <div class="calendar-day ${isToday ? 'today' : ''} ${hasNote ? 'has-note' : ''}" onclick="openDayModal('${dateStr}')" ondblclick="openDayModal('${dateStr}', true)" title="${holiday ? holiday.name : ''}">
+            <span class="daynum" style="${isWeekend && !isToday && !hasNote ? 'color:#FF8F80' : ''}">${d}</span>
+            ${hasNote ? '<div class="note-text">' + escapeHtml(noteText) + '</div>' : ''}
+            ${marks ? '<div class="marks ' + (hasNote ? 'inline' : '') + '">' + marks + '</div>' : ''}
           </div>
         `
       }
