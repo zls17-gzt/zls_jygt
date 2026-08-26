@@ -393,6 +393,15 @@
   <div id="page-kids" class="page">
     <div class="class-bar"></div>
     <div class="card">
+      <h3>🏫 班级管理</h3>
+      <div id="class-list" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input id="new-class-name" placeholder="新班级名称" style="flex:1;margin:0;">
+        <button onclick="addClass(document.getElementById('new-class-name').value)" style="width:auto;flex:0;padding:8px 14px;">添加</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
+    </div>
+    <div class="card">
       <h3>👶 添加孩子</h3>
       <input id="k-name" placeholder="姓名 *">
       <select id="k-gender">
@@ -429,15 +438,6 @@
   <!-- 设置页 -->
   <div id="page-settings" class="page">
     <div class="card">
-      <h3>🏫 班级管理</h3>
-      <div id="class-list" style="margin-bottom:10px;"></div>
-      <div style="display:flex;gap:8px;">
-        <input id="new-class-name" placeholder="新班级名称" style="flex:1;margin:0;">
-        <button onclick="addClass(document.getElementById('new-class-name').value)" style="width:auto;flex:0;padding:8px 14px;">添加</button>
-      </div>
-      <p style="font-size:12px;color:var(--muted);margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
-    </div>
-    <div class="card">
       <h3>🎉 自定义节假日</h3>
       <h4 style="margin:16px 0 8px;font-size:14px;">添加自定义节假日</h4>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
@@ -470,7 +470,7 @@
     <button class="active" onclick="switchTab('home', this)"><img src="icons/mascot.png"><span>首页</span></button>
     <button onclick="switchTab('record', this)"><img src="icons/eat.png"><span>记录</span></button>
     <button onclick="switchTab('report', this)"><img src="icons/work.png"><span>周报</span></button>
-    <button onclick="switchTab('kids', this)"><img src="icons/sport.png"><span>孩子</span></button>
+    <button onclick="switchTab('kids', this)"><img src="icons/sport.png"><span>班级管理</span></button>
     <button onclick="switchTab('settings', this)"><img src="icons/briefcase.png"><span>设置</span></button>
   </div>
 
