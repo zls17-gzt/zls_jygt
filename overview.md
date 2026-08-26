@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v19**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v20**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -20,11 +20,14 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - **永久网址**：https://zls17-gzt.github.io/zls_jygt/ （实测可访问，title=家园沟通站）
 - **后续更新**：修改代码后，把 `sw.js` 的 `CACHE_NAME` 升一版（如 v13），再 `git push` 即可；手机端关掉重开生效。
 
-## 本次改动（v19 · 修复 CSV 下载 + 添加孩子仅姓名必填）
+## 本次改动（v20 · 左侧边栏改回底部 Tab 栏）
 
-- **修复「下载 CSV 模板」在手机端无反应**：把动态创建的 `<a>` 元素临时挂到 `document.body` 再触发 `click()`，解决部分手机浏览器（如 iOS Safari、微信内置浏览器）对游离锚点点击的拦截问题。
-- **添加孩子仅姓名必填**：手机号留空也能正常添加；如果填了手机号，仍会做 11 位数字格式校验，格式不对才提示。
-- `sw.js` 升级到 v19。
+- 导航从**左侧固定边栏**改回**底部 Tab 栏**，更适合手机单手操作。
+- 底部栏图标在上、文字在下，5 个入口均分宽度；当前项文字加粗、图标高亮。
+- 页面布局同步调整：顶栏恢复全宽，内容区底部留出 90px 避免被 Tab 栏遮挡。
+- `sw.js` 升级到 v20。
+
+> 之前 v19 的改动：修复手机端 CSV 模板下载无反应；添加孩子仅姓名必填。
 
 > 之前 v18 的改动：新增「发现新版本」刷新提示条，SW 改为等待用户点击后才激活。
 
@@ -42,8 +45,8 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 
 | 文件 | 说明 |
 |---|---|
-| `index.html` | 主应用（左侧边栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v19） |
+| `index.html` | 主应用（底部 Tab 栏 + 奶油黄可爱风格） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v20） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |
