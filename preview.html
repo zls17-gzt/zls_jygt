@@ -42,7 +42,7 @@
     /* 新版本提示条 */
     .update-banner {
       display: none; position: fixed; left: 50%; transform: translateX(-50%);
-      bottom: 80px; z-index: 90; align-items: center; gap: 12px;
+      bottom: 80px; z-index: 50; align-items: center; gap: 12px;
       background: var(--primary-dark); color: #fff; padding: 10px 14px;
       border-radius: 999px; box-shadow: 0 6px 20px rgba(93,64,55,.25);
       font-size: 13px; max-width: 92%;
@@ -231,23 +231,24 @@
 
     /* 底部 Tab 栏 */
     .tabbar {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
       display: flex; justify-content: space-around; align-items: center;
       background: var(--card); border-top: 1px solid var(--border);
-      padding: 6px 0 12px;
+      padding: 6px 0 12px; pointer-events: auto;
     }
     .tabbar button {
       flex: 1; background: none; border-radius: 0; box-shadow: none;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 2px; font-size: 11px; color: var(--muted); font-weight: normal;
-      padding: 4px 0; border: none;
+      padding: 8px 4px; border: none; position: relative; z-index: 1;
+      touch-action: manipulation; -webkit-appearance: none; appearance: none;
     }
     .tabbar button img { width: 28px; height: 28px; object-fit: contain; opacity: .7; }
     .tabbar button.active { color: var(--primary-dark); font-weight: bold; background: none; }
     .tabbar button.active img { opacity: 1; }
     .app-header { left: 0; }
     .page { padding: 86px 16px 90px; }
-    body { padding-bottom: 80px; }
+    body { padding-bottom: 0; }
   </style>
 </head>
 <body>
