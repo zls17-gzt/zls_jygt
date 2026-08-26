@@ -412,6 +412,9 @@
       <h3>💾 数据备份</h3>
       <button onclick="exportBackup()" class="secondary">导出备份（JSON）</button>
       <p style="font-size:12px;color:var(--muted);margin:10px 0 0">建议每周导出一次，防止换手机/清数据丢失。</p>
+      <h4 style="margin:16px 0 8px;font-size:14px;">导入备份</h4>
+      <input type="file" id="backup-import" accept=".json" style="display:none" onchange="importBackup(this)">
+      <button onclick="document.getElementById('backup-import').click()" class="secondary">选择备份文件导入</button>
     </div>
   </div>
 
@@ -1218,9 +1221,39 @@
       const a = document.createElement('a')
       a.href = url
       a.download = 'jiayuan-backup-' + new Date().toISOString().slice(0, 10) + '.json'
+      a.style.display = 'none'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, 200)
       alert('已导出备份文件 ✅')
+    }
+    function importBackup(input) {
+      const file = input.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = e => {
+        try {
+          const data = JSON.parse(e.target.result)
+          if (!data || !Array.isArray(data.classes)) {
+            return alert('备份文件格式不正确，缺少 classes 数据')
+          }
+          if (!confirm('导入备份会覆盖当前所有数据（' + (data.classes.length || 0) + ' 个班级），确定继续吗？')) {
+            input.value = ''
+            return
+          }
+          localStorage.setItem(STORE_KEY, JSON.stringify(data))
+          renderAll()
+          input.value = ''
+          alert('备份导入成功 ✅')
+        } catch (err) {
+          alert('文件解析失败：' + err.message)
+          input.value = ''
+        }
+      }
+      reader.readAsText(file)
     }
     async function polishReport() {
       const apiKey = getKey()
