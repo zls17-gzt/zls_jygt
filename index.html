@@ -238,11 +238,11 @@
     }
     .report-history-item .rh-tag.original { background: #E8F5E9; color: #2E7D32; }
     .report-history-item .rh-tag.polished { background: #FFF3E0; color: #E65100; }
-    #report-history-detail {
+    #report-history-detail, #obs-history-detail {
       display: none; position: fixed; inset: 0; background: rgba(93,64,55,.5); z-index: 200;
       padding: 20px; align-items: center; justify-content: center;
     }
-    #report-history-detail.active { display: flex; }
+    #report-history-detail.active, #obs-history-detail.active { display: flex; }
     .rh-detail-box {
       background: var(--card); border-radius: 16px; padding: 20px; max-width: 560px; width: 100%;
       max-height: 80vh; overflow-y: auto; box-shadow: 0 12px 40px rgba(93,64,55,.25);
