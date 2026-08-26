@@ -229,25 +229,25 @@
     .record-card img, .kid-card img { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
 
 
-    /* 左侧边栏导航 */
+    /* 底部 Tab 栏 */
     .tabbar {
-      position: fixed; top: 0; bottom: 0; left: 0; width: 92px; z-index: 110;
-      display: flex; flex-direction: column; align-items: stretch;
-      background: var(--card); border-right: 1px solid var(--border);
-      padding: 14px 0 20px; overflow-y: auto;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
+      display: flex; justify-content: space-around; align-items: center;
+      background: var(--card); border-top: 1px solid var(--border);
+      padding: 6px 0 12px;
     }
     .tabbar button {
-      width: 100%; background: none; border-radius: 0; box-shadow: none;
+      flex: 1; background: none; border-radius: 0; box-shadow: none;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 4px; font-size: 11px; color: var(--muted); font-weight: normal;
-      padding: 10px 4px; border-left: 3px solid transparent;
+      gap: 2px; font-size: 11px; color: var(--muted); font-weight: normal;
+      padding: 4px 0; border: none;
     }
-    .tabbar button img { width: 34px; height: 34px; object-fit: contain; opacity: .7; }
-    .tabbar button.active { color: var(--primary-dark); font-weight: bold; background: #FFF8E1; border-left-color: var(--primary-dark); }
+    .tabbar button img { width: 28px; height: 28px; object-fit: contain; opacity: .7; }
+    .tabbar button.active { color: var(--primary-dark); font-weight: bold; background: none; }
     .tabbar button.active img { opacity: 1; }
-    .app-header { left: 92px; }
-    .page { padding: 86px 16px 16px 108px; }
-    body { padding-bottom: 0; }
+    .app-header { left: 0; }
+    .page { padding: 86px 16px 90px; }
+    body { padding-bottom: 80px; }
   </style>
 </head>
 <body>
@@ -415,7 +415,7 @@
     </div>
   </div>
 
-  <!-- 左侧边栏 -->
+  <!-- 底部 Tab 栏 -->
   <div class="tabbar">
     <button class="active" onclick="switchTab('home', this)"><img src="icons/mascot.png"><span>首页</span></button>
     <button onclick="switchTab('record', this)"><img src="icons/eat.png"><span>记录</span></button>
