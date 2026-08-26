@@ -231,20 +231,22 @@
 
     /* 底部 Tab 栏 */
     .tabbar {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+      position: fixed; bottom: 0; left: 0; width: 100%; z-index: 999;
       display: flex; justify-content: space-around; align-items: center;
       background: var(--card); border-top: 1px solid var(--border);
-      padding: 6px 0 12px; pointer-events: auto;
+      padding: 6px 0 max(12px, env(safe-area-inset-bottom));
+      -webkit-transform: translateZ(0); transform: translateZ(0);
+      touch-action: manipulation;
     }
     .tabbar button {
-      flex: 1; background: none; border-radius: 0; box-shadow: none;
+      flex: 1; background: transparent; border-radius: 0; box-shadow: none;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 2px; font-size: 11px; color: var(--muted); font-weight: normal;
-      padding: 8px 4px; border: none; position: relative; z-index: 1;
-      touch-action: manipulation; -webkit-appearance: none; appearance: none;
+      padding: 10px 4px; border: none; cursor: pointer; user-select: none;
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
     }
-    .tabbar button img { width: 28px; height: 28px; object-fit: contain; opacity: .7; }
-    .tabbar button.active { color: var(--primary-dark); font-weight: bold; background: none; }
+    .tabbar button img { width: 28px; height: 28px; object-fit: contain; opacity: .7; pointer-events: none; }
+    .tabbar button.active { color: var(--primary-dark); font-weight: bold; background: transparent; }
     .tabbar button.active img { opacity: 1; }
     .app-header { left: 0; }
     .page { padding: 86px 16px 90px; }
@@ -700,9 +702,8 @@
       const phoneRaw = document.getElementById('k-parent-phone').value.trim()
       const phones = phoneRaw ? parsePhones(phoneRaw) : []
       if (phones === null) return alert('家长手机号应为 11 位数字（多个用空格或逗号分隔）')
-      const cls = getCurrentClass()
       const db = load()
-      const cls = getCurrentClass()
+      const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
       cls.children.push({
         id: Date.now().toString(),
         name,
@@ -783,7 +784,7 @@
       const checked = [...document.querySelectorAll('input[name="r-child"]:checked')]
       if (checked.length === 0) return alert('请至少选择一名幼儿')
       const db = load()
-      const cls = getCurrentClass()
+      const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
       const payload = {
         childIds: checked.map(cb => cb.value),
         childNames: checked.map(cb => cb.dataset.name),
@@ -832,7 +833,7 @@
       if (!editingRecordId) return
       if (!confirm('确定删除这条记录吗？')) return
       const db = load()
-      const cls = getCurrentClass()
+      const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
       cls.records = cls.records.filter(r => r.id !== editingRecordId)
       save(db)
       cancelEdit()
@@ -1044,7 +1045,7 @@
         const idx = key => header.indexOf(key)
         let success = 0, fail = []
         const db = load()
-        const cls = getCurrentClass()
+        const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
         for (let i = 1; i < lines.length; i++) {
           const cols = parseCsvLine(lines[i])
           const name = (cols[nameIdx] || '').trim()
