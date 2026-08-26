@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v16**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v17**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -20,12 +20,12 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - **永久网址**：https://zls17-gzt.github.io/zls_jygt/ （实测可访问，title=家园沟通站）
 - **后续更新**：修改代码后，把 `sw.js` 的 `CACHE_NAME` 升一版（如 v13），再 `git push` 即可；手机端关掉重开生效。
 
-## 本次改动（v16 · 设置页移除节假日倒计时）
+## 本次改动（v17 · 顶栏标题改为「遇见」）
 
-- 设置页里的**「节假日倒计时」卡片已删除**，不再展示内置节假日的倒计时网格。
-- **自定义节假日管理保留**：仍可添加、删除自己的节假日；自定义节假日继续用于月历粉点标记和首页「最近节日」统计。
-- 同步清理了仅用于倒计时的 `.holiday-grid` / `.holiday-card` 等 CSS。
-- `sw.js` 升级到 v16。
+- 首页顶栏标题从「欢迎来到家园沟通站」改为「**遇见**」，右侧日期与本地存储状态保持不变。
+- `sw.js` 升级到 v17。
+
+> 之前 v16 的改动：设置页移除「节假日倒计时」，保留自定义节假日管理。
 
 > 之前 v15 的改动：月历已写笔记的日期格半透明并直接显示编辑文字。
 
@@ -38,7 +38,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（左侧边栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v16） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v17） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |
