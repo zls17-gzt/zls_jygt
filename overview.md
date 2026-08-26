@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v17**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v18**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -20,10 +20,13 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - **永久网址**：https://zls17-gzt.github.io/zls_jygt/ （实测可访问，title=家园沟通站）
 - **后续更新**：修改代码后，把 `sw.js` 的 `CACHE_NAME` 升一版（如 v13），再 `git push` 即可；手机端关掉重开生效。
 
-## 本次改动（v17 · 顶栏标题改为「遇见」）
+## 本次改动（v18 · 新增「发现新版本」刷新提示）
 
-- 首页顶栏标题从「欢迎来到家园沟通站」改为「**遇见**」，右侧日期与本地存储状态保持不变。
-- `sw.js` 升级到 v17。
+- 新增底部居中提示条：**检测到新版本时自动弹出「🎉 发现新版本，点击刷新体验 + 立即更新」**，点击后 Service Worker 跳过等待、接管页面并自动刷新，彻底告别手动清缓存。
+- SW 行为调整：安装后不再 `skipWaiting` 自动激活，而是等新版本就绪后由页面提示用户点击「立即更新」再激活，避免旧页面被悄悄替换导致数据/交互异常。
+- `sw.js` 升级到 v18。
+
+> 之前 v17 的改动：顶栏标题改为「遇见」。
 
 > 之前 v16 的改动：设置页移除「节假日倒计时」，保留自定义节假日管理。
 
@@ -38,7 +41,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（左侧边栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v17） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v18） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |

@@ -1,16 +1,20 @@
-const CACHE_NAME = 'jiayuan-v17'
+const CACHE_NAME = 'jiayuan-v18'
 const ASSETS = ['./', './index.html', './manifest.json',
                 './icon-192.png', './icon-512.png',
                 './icons/mascot.png', './icons/eat.png', './icons/work.png',
                 './icons/sport.png', './icons/briefcase.png', './icons/flower.png',
                 './icons/drink.png', './icons/rest.png', './icons/card.png']
-// 安装：逐个缓存，单个失败不拖垮整体
+// 安装：逐个缓存，单个失败不拖垮整体（不自动 skipWaiting，等新版本就绪后由页面提示用户刷新）
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
       Promise.allSettled(ASSETS.map(url => cache.add(url)))
-    ).then(() => self.skipWaiting())
+    )
   )
+})
+// 收到页面「SKIP_WAITING」消息后再激活，接管页面
+self.addEventListener('message', (e) => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting()
 })
 // 激活：清理旧版本缓存（改代码后必须升级v1→v2，用户才能拿到新版）
 self.addEventListener('activate', (e) => {
