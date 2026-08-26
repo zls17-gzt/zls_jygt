@@ -224,6 +224,37 @@
     }
     .report-output img { max-width: 48%; border-radius: 8px; margin: 8px 4px 0 0; display: inline-block; vertical-align: top; }
 
+    /* 周报历史 */
+    .report-history-item {
+      background: var(--card-soft); border: 1px solid var(--border); border-radius: 12px;
+      padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: background .2s;
+    }
+    .report-history-item:hover { background: #FFF3E0; }
+    .report-history-item .rh-title { font-size: 14px; font-weight: bold; color: var(--text); }
+    .report-history-item .rh-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .report-history-item .rh-tag {
+      display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px;
+      margin-left: 6px; vertical-align: middle;
+    }
+    .report-history-item .rh-tag.original { background: #E8F5E9; color: #2E7D32; }
+    .report-history-item .rh-tag.polished { background: #FFF3E0; color: #E65100; }
+    #report-history-detail {
+      display: none; position: fixed; inset: 0; background: rgba(93,64,55,.5); z-index: 200;
+      padding: 20px; align-items: center; justify-content: center;
+    }
+    #report-history-detail.active { display: flex; }
+    .rh-detail-box {
+      background: var(--card); border-radius: 16px; padding: 20px; max-width: 560px; width: 100%;
+      max-height: 80vh; overflow-y: auto; box-shadow: 0 12px 40px rgba(93,64,55,.25);
+    }
+    .rh-detail-box .rh-detail-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+    .rh-detail-box .rh-detail-body { white-space: pre-wrap; font-size: 14px; line-height: 1.7; }
+    .rh-detail-box .rh-detail-body img { max-width: 48%; border-radius: 8px; margin: 8px 4px 0 0; display: inline-block; }
+    .rh-detail-box .rh-detail-close {
+      margin-top: 14px; width: 100%; background: var(--primary); color: #fff; border: none;
+      padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer;
+    }
+
     /* 记录/孩子卡片 */
     .record-card, .kid-card { cursor: pointer; }
     .record-card img, .kid-card img { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
@@ -352,6 +383,10 @@
       <button onclick="polishReport()" style="margin-top:10px;background:#FFF3E0;color:#8D6E63;">✨ AI 润色</button>
       <p style="font-size:12px;color:var(--muted);margin:10px 0 0">点击「导出周报图片」可把文字和照片合成一张图片，保存后直接发给家长。</p>
     </div>
+    <div class="card">
+      <h3>📜 周报历史</h3>
+      <div id="report-history-list"></div>
+    </div>
   </div>
 
   <!-- 孩子管理页 -->
@@ -380,6 +415,15 @@
       <button onclick="document.getElementById('k-import').click()">导入 CSV 文件</button>
     </div>
     <div id="kid-list"></div>
+  </div>
+
+  <!-- 周报历史详情弹窗 -->
+  <div id="report-history-detail" onclick="if(event.target===this)closeReportHistoryDetail()">
+    <div class="rh-detail-box">
+      <div class="rh-detail-title" id="rh-detail-title">周报详情</div>
+      <div class="rh-detail-body" id="rh-detail-body"></div>
+      <button class="rh-detail-close" onclick="closeReportHistoryDetail()">关闭</button>
+    </div>
   </div>
 
   <!-- 设置页 -->
@@ -485,6 +529,8 @@
 
     /* ============ B2 数据层：localStorage 存取 ============ */
     const STORE_KEY = 'jiayuan-data'
+    const REPORT_HISTORY_KEY = 'jiayuan-report-history'
+    const DAY_NOTES_KEY = 'jiayuan-daynotes'
     function load() {
       try {
         let db = JSON.parse(localStorage.getItem(STORE_KEY))
@@ -658,7 +704,6 @@
       el.innerHTML = html
     }
     /* ============ 月历每日笔记 ============ */
-    const DAY_NOTES_KEY = 'jiayuan-daynotes'
     let currentDayNoteDate = ''
     function loadDayNotes() {
       try { return JSON.parse(localStorage.getItem(DAY_NOTES_KEY)) || {} }
@@ -903,6 +948,7 @@
         </div>`).join('') || ''
       renderClassSettings()
       renderHolidays()
+      renderReportHistory()
     }
     function toggleKidDetail(id) {
       const el = document.getElementById('kid-detail-' + id)
@@ -1094,6 +1140,8 @@
 
     /* ============ 周报生成 ============ */
     let currentReportImages = []
+    let currentReportChildId = ''
+    let currentReportChildName = ''
     function escapeHtml(text) {
       return text.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
     }
@@ -1101,6 +1149,63 @@
       const imageHtml = (images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
       document.getElementById('w-out').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
         (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+    }
+    // 保存周报到历史
+    function saveReportHistory(text, images, isPolished) {
+      const list = JSON.parse(localStorage.getItem(REPORT_HISTORY_KEY) || '[]')
+      list.unshift({
+        id: Date.now().toString(),
+        childId: currentReportChildId,
+        childName: currentReportChildName,
+        text,
+        images: images || [],
+        isPolished: !!isPolished,
+        createdAt: new Date().toISOString()
+      })
+      // 最多保留 50 条
+      if (list.length > 50) list.length = 50
+      localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(list))
+      renderReportHistory()
+    }
+    // 渲染周报历史列表
+    function renderReportHistory() {
+      const el = document.getElementById('report-history-list')
+      if (!el) return
+      const list = JSON.parse(localStorage.getItem(REPORT_HISTORY_KEY) || '[]')
+      if (list.length === 0) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--muted)">还没有生成过周报</div>'
+        return
+      }
+      el.innerHTML = list.map(h => {
+        const date = new Date(h.createdAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        const tagClass = h.isPolished ? 'polished' : 'original'
+        const tagText = h.isPolished ? 'AI润色' : '原始'
+        const preview = h.text.slice(0, 30).replace(/\n/g, ' ') + '…'
+        return `
+          <div class="report-history-item" onclick="showReportHistoryDetail('${h.id}')">
+            <div class="rh-title">${escapeHtml(h.childName)} · ${escapeHtml(preview)}
+              <span class="rh-tag ${tagClass}">${tagText}</span>
+            </div>
+            <div class="rh-meta">${date} · ${(h.images || []).length} 张照片</div>
+          </div>
+        `
+      }).join('')
+    }
+    // 查看历史周报详情
+    function showReportHistoryDetail(id) {
+      const list = JSON.parse(localStorage.getItem(REPORT_HISTORY_KEY) || '[]')
+      const h = list.find(x => x.id === id)
+      if (!h) return
+      const date = new Date(h.createdAt).toLocaleString('zh-CN')
+      const tag = h.isPolished ? 'AI润色版' : '原始版'
+      document.getElementById('rh-detail-title').textContent = `${escapeHtml(h.childName)} · ${tag} · ${date}`
+      const imageHtml = (h.images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('rh-detail-body').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(h.text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+      document.getElementById('report-history-detail').classList.add('active')
+    }
+    function closeReportHistoryDetail() {
+      document.getElementById('report-history-detail').classList.remove('active')
     }
     function genReport() {
       const cls = getCurrentClass()
@@ -1126,7 +1231,10 @@
         (r.images || []).forEach(img => { if (!images.includes(img)) images.push(img) })
       })
       currentReportImages = images
+      currentReportChildId = childId
+      currentReportChildName = childName
       renderReport(reportText, images)
+      saveReportHistory(reportText, images, false)
     }
     function exportReportImage() {
       if (!currentReportImages.length && !document.getElementById('w-out').innerText.trim())
@@ -1284,6 +1392,7 @@
         const data = await res.json()
         const polished = data.choices[0].message.content.trim()
         renderReport(polished, currentReportImages)
+        saveReportHistory(polished, currentReportImages, true)
         alert('AI 润色完成 ✨')
       } catch (e) {
         alert('AI 润色失败（' + e.message + '），已保留原有模板文字。')
