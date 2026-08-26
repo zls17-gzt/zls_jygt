@@ -697,6 +697,8 @@
       const phones = phoneRaw ? parsePhones(phoneRaw) : []
       if (phones === null) return alert('家长手机号应为 11 位数字（多个用空格或逗号分隔）')
       const cls = getCurrentClass()
+      const db = load()
+      const cls = getCurrentClass()
       cls.children.push({
         id: Date.now().toString(),
         name,
@@ -708,7 +710,7 @@
         note: document.getElementById('k-note').value.trim(),
         createdAt: new Date().toISOString()
       })
-      save(load())
+      save(db)
       document.getElementById('k-name').value = ''
       document.getElementById('k-gender').value = ''
       document.getElementById('k-birthday').value = ''
@@ -776,6 +778,7 @@
     function saveRecord() {
       const checked = [...document.querySelectorAll('input[name="r-child"]:checked')]
       if (checked.length === 0) return alert('请至少选择一名幼儿')
+      const db = load()
       const cls = getCurrentClass()
       const payload = {
         childIds: checked.map(cb => cb.value),
@@ -791,7 +794,7 @@
       } else {
         cls.records.push({ id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), ...payload })
       }
-      save(load())
+      save(db)
       cancelEdit()
       renderAll()
       alert(isEdit ? '已更新 ✅' : '已保存 ✅')
@@ -824,9 +827,10 @@
     function deleteRecord() {
       if (!editingRecordId) return
       if (!confirm('确定删除这条记录吗？')) return
+      const db = load()
       const cls = getCurrentClass()
       cls.records = cls.records.filter(r => r.id !== editingRecordId)
-      save(load())
+      save(db)
       cancelEdit()
       renderAll()
       alert('已删除 ✅')
@@ -1035,6 +1039,7 @@
         if (nameIdx === -1) return alert('模板缺少「姓名」列，请使用下载的模板')
         const idx = key => header.indexOf(key)
         let success = 0, fail = []
+        const db = load()
         const cls = getCurrentClass()
         for (let i = 1; i < lines.length; i++) {
           const cols = parseCsvLine(lines[i])
@@ -1055,7 +1060,7 @@
           })
           success++
         }
-        save(load())
+        save(db)
         renderAll()
         input.value = ''
         let msg = '成功导入 ' + success + ' 个孩子'
