@@ -384,6 +384,19 @@
       <p style="font-size:12px;color:var(--muted);margin:10px 0 0">点击「导出周报图片」可把文字和照片合成一张图片，保存后直接发给家长。</p>
     </div>
     <div class="card">
+      <h3>👁 幼儿观察记录</h3>
+      <select id="obs-child"></select>
+      <button onclick="genObservation()">生成观察记录</button>
+      <div id="obs-out" class="report-output" contenteditable="false"></div>
+      <button onclick="exportObservationImage()" class="secondary">🖼 导出观察记录图片</button>
+      <button onclick="polishObservation()" style="margin-top:10px;background:#FFF3E0;color:#8D6E63;">✨ AI 润色</button>
+      <p style="font-size:12px;color:var(--muted);margin:10px 0 0">生成后会自动填充「观察情况记录」，评价分析与策略部分可手动填写或用 AI 润色补全。</p>
+    </div>
+    <div class="card">
+      <h3>📜 观察记录历史</h3>
+      <div id="obs-history-list"></div>
+    </div>
+    <div class="card">
       <h3>📜 周报历史</h3>
       <div id="report-history-list"></div>
     </div>
@@ -432,6 +445,15 @@
       <div class="rh-detail-title" id="rh-detail-title">周报详情</div>
       <div class="rh-detail-body" id="rh-detail-body"></div>
       <button class="rh-detail-close" onclick="closeReportHistoryDetail()">关闭</button>
+    </div>
+  </div>
+
+  <!-- 观察记录历史详情弹窗 -->
+  <div id="obs-history-detail" onclick="if(event.target===this)closeObservationHistoryDetail()">
+    <div class="rh-detail-box">
+      <div class="rh-detail-title" id="obs-detail-title">观察记录详情</div>
+      <div class="rh-detail-body" id="obs-detail-body"></div>
+      <button class="rh-detail-close" onclick="closeObservationHistoryDetail()">关闭</button>
     </div>
   </div>
 
@@ -919,6 +941,8 @@
       // 周报下拉
       const opts = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
       document.getElementById('w-child').innerHTML = opts || '<option value="">（当前班级还没有孩子）</option>'
+      // 观察记录下拉
+      document.getElementById('obs-child').innerHTML = opts || '<option value="">（当前班级还没有孩子）</option>'
       // 今日记录
       const today = new Date().toISOString().slice(0, 10)
       document.getElementById('record-list').innerHTML = records
@@ -949,6 +973,7 @@
       renderClassSettings()
       renderHolidays()
       renderReportHistory()
+      renderObservationHistory()
     }
     function toggleKidDetail(id) {
       const el = document.getElementById('kid-detail-' + id)
@@ -1312,6 +1337,250 @@
         if (line) lines.push(line)
       })
       return lines
+    }
+
+    /* ============ 幼儿观察记录 ============ */
+    const OBSERVATION_HISTORY_KEY = 'jiayuan-observation-history'
+    let currentObservationImages = []
+    let currentObservationChildId = ''
+    let currentObservationChildName = ''
+    let currentObservationText = ''
+
+    function renderObservation(text, images) {
+      const imageHtml = (images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('obs-out').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+    }
+
+    function saveObservationHistory(text, images, isPolished) {
+      const list = JSON.parse(localStorage.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      list.unshift({
+        id: Date.now().toString(),
+        childId: currentObservationChildId,
+        childName: currentObservationChildName,
+        text,
+        images: images || [],
+        isPolished: !!isPolished,
+        createdAt: new Date().toISOString()
+      })
+      if (list.length > 50) list.length = 50
+      localStorage.setItem(OBSERVATION_HISTORY_KEY, JSON.stringify(list))
+      renderObservationHistory()
+    }
+
+    function renderObservationHistory() {
+      const el = document.getElementById('obs-history-list')
+      if (!el) return
+      const list = JSON.parse(localStorage.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      if (list.length === 0) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--muted)">还没有生成过观察记录</div>'
+        return
+      }
+      el.innerHTML = list.map(h => {
+        const date = new Date(h.createdAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        const tagClass = h.isPolished ? 'polished' : 'original'
+        const tagText = h.isPolished ? 'AI润色' : '原始'
+        const preview = h.text.slice(0, 30).replace(/\n/g, ' ') + '…'
+        return `
+          <div class="report-history-item" onclick="showObservationHistoryDetail('${h.id}')">
+            <div class="rh-title">${escapeHtml(h.childName)} · ${escapeHtml(preview)}
+              <span class="rh-tag ${tagClass}">${tagText}</span>
+            </div>
+            <div class="rh-meta">${date} · ${(h.images || []).length} 张照片</div>
+          </div>
+        `
+      }).join('')
+    }
+
+    function showObservationHistoryDetail(id) {
+      const list = JSON.parse(localStorage.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      const h = list.find(x => x.id === id)
+      if (!h) return
+      const date = new Date(h.createdAt).toLocaleString('zh-CN')
+      const tag = h.isPolished ? 'AI润色版' : '原始版'
+      document.getElementById('obs-detail-title').textContent = `${escapeHtml(h.childName)} · ${tag} · ${date}`
+      const imageHtml = (h.images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('obs-detail-body').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(h.text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+      document.getElementById('obs-history-detail').classList.add('active')
+    }
+
+    function closeObservationHistoryDetail() {
+      document.getElementById('obs-history-detail').classList.remove('active')
+    }
+
+    function genObservation() {
+      const cls = getCurrentClass()
+      const childSel = document.getElementById('obs-child')
+      const childId = childSel.value
+      if (!childId) return alert('当前班级还没有孩子')
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+      const records = cls.records.filter(r => ((r.childIds) || []).includes(childId) && r.date >= weekAgo)
+      if (records.length === 0) return alert('这个孩子最近7天还没有记录')
+      const childName = childSel.options[childSel.selectedIndex].text
+      const child = cls.children.find(c => c.id === childId)
+      const gender = child && child.gender ? child.gender : '____'
+      const age = child && child.birthday ? calcAge(child.birthday) : '____'
+      const className = cls.name
+      const today = new Date().toISOString().slice(0, 10)
+
+      const areaMap = {}
+      records.forEach(r => { (areaMap[r.area] = areaMap[r.area] || []).push(r) })
+      const areaDescs = Object.entries(areaMap)
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([area, rs]) => {
+          const texts = rs.map(r => r.text).join('；')
+          return `在${area}，${texts}。`
+        })
+
+      const mainArea = Object.keys(areaMap).sort((a, b) => areaMap[b].length - areaMap[a].length)[0] || '____'
+      const obsTime = records.map(r => r.date).sort()[0] || today
+
+      const observationText = `观察对象：${childName}    性别：${gender}    年龄：${age}岁    班级：${className}
+记录教师：_________
+
+所在区：${mainArea}    观察时间：${obsTime}
+
+观察情况记录：
+${areaDescs.join('\n')}
+
+评价与分析：
+独立性分析：________________________________________
+个性特点：________________________________________
+发展水平：________________________________________
+
+教师介入及策略：
+1. ________________________________________________
+2. ________________________________________________
+3. ________________________________________________
+4. ________________________________________________
+5. ________________________________________________
+
+改进措施及目标：
+材料调整：________________________________________
+活动优化：________________________________________
+发展展望：________________________________________`
+
+      const images = []
+      records.forEach(r => {
+        (r.images || []).forEach(img => { if (!images.includes(img)) images.push(img) })
+      })
+      currentObservationImages = images
+      currentObservationChildId = childId
+      currentObservationChildName = childName
+      currentObservationText = observationText
+      renderObservation(observationText, images)
+      saveObservationHistory(observationText, images, false)
+    }
+
+    function calcAge(birthday) {
+      const birth = new Date(birthday)
+      const now = new Date()
+      let age = now.getFullYear() - birth.getFullYear()
+      const m = now.getMonth() - birth.getMonth()
+      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
+      return age > 0 ? age : 1
+    }
+
+    async function polishObservation() {
+      const apiKey = getKey()
+      if (!apiKey) return alert('请先在「设置」里填写 DeepSeek API Key')
+      if (!currentObservationText) return alert('请先生成观察记录')
+      if (!confirm('将用 AI 润色并补全观察记录（消耗约几分钱），是否继续？')) return
+      try {
+        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: '你是一位资深幼儿园教师，擅长撰写专业、温暖、具体的幼儿观察记录。请根据提供的观察情况记录，补全并润色整篇观察记录，包含评价与分析、教师介入及策略、改进措施及目标。语言要温暖专业，内容具体有针对性，不要空洞套话。只返回润色后的完整观察记录正文，不要解释。' },
+              { role: 'user', content: currentObservationText }
+            ],
+            temperature: 0.6
+          })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const data = await res.json()
+        const polished = data.choices[0].message.content.trim()
+        renderObservation(polished, currentObservationImages)
+        saveObservationHistory(polished, currentObservationImages, true)
+        alert('AI 润色完成 ✨')
+      } catch (e) {
+        alert('AI 润色失败（' + e.message + '），已保留原有模板文字。')
+      }
+    }
+
+    function exportObservationImage() {
+      if (!currentObservationText && !document.getElementById('obs-out').innerText.trim())
+        return alert('请先生成观察记录')
+      const scale = 2
+      const maxWidth = 600
+      const padding = 24
+      const lineHeight = 24
+      const fontSize = 16
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      ctx.font = fontSize + 'px sans-serif'
+      const textLines = wrapText(ctx, document.getElementById('obs-out').innerText, maxWidth)
+      const textHeight = textLines.length * lineHeight
+      const imgSize = (maxWidth - 8) / 2
+      const imgGap = 8
+      const imgRows = Math.ceil(currentObservationImages.length / 2)
+      const imgHeight = imgRows > 0 ? imgRows * (imgSize + imgGap) : 0
+      const contentHeight = textHeight + (imgHeight > 0 ? 12 + imgHeight : 0)
+      const totalW = maxWidth + padding * 2
+      const totalH = contentHeight + padding * 2
+      canvas.width = totalW * scale
+      canvas.height = totalH * scale
+      ctx.scale(scale, scale)
+      ctx.fillStyle = '#FFFDF5'
+      ctx.fillRect(0, 0, totalW, totalH)
+      ctx.fillStyle = '#5D4037'
+      ctx.font = fontSize + 'px sans-serif'
+      ctx.textBaseline = 'top'
+      let y = padding
+      textLines.forEach(line => { ctx.fillText(line, padding, y); y += lineHeight })
+      if (currentObservationImages.length > 0) {
+        y += 12
+        let pending = currentObservationImages.length
+        currentObservationImages.forEach((src, i) => {
+          const col = i % 2, row = Math.floor(i / 2)
+          const x = padding + col * (imgSize + imgGap)
+          const iy = y + row * (imgSize + imgGap)
+          const img = new Image()
+          img.onload = () => {
+            const ratio = Math.min(imgSize / img.width, imgSize / img.height)
+            const dw = img.width * ratio, dh = img.height * ratio
+            ctx.drawImage(img, x + (imgSize - dw) / 2, iy + (imgSize - dh) / 2, dw, dh)
+            ctx.strokeStyle = '#E0C97F'
+            ctx.lineWidth = 1
+            ctx.strokeRect(x, iy, imgSize, imgSize)
+            if (--pending === 0) downloadObservationCanvas(canvas)
+          }
+          img.onerror = () => { if (--pending === 0) downloadObservationCanvas(canvas) }
+          img.src = src
+        })
+      } else {
+        downloadObservationCanvas(canvas)
+      }
+    }
+
+    function downloadObservationCanvas(canvas) {
+      const url = canvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '观察记录-' + (currentObservationChildName || '未命名') + '-' + new Date().toISOString().slice(0, 10) + '.png'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a)
+      }, 200)
+      alert('观察记录图片已导出 ✅')
     }
 
     /* ============ 设置 / 备份 / AI 润色 ============ */
