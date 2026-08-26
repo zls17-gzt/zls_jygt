@@ -693,7 +693,8 @@
     function addChild() {
       const name = document.getElementById('k-name').value.trim()
       if (!name) return alert('请输入姓名')
-      const phones = parsePhones(document.getElementById('k-parent-phone').value)
+      const phoneRaw = document.getElementById('k-parent-phone').value.trim()
+      const phones = phoneRaw ? parsePhones(phoneRaw) : []
       if (phones === null) return alert('家长手机号应为 11 位数字（多个用空格或逗号分隔）')
       const cls = getCurrentClass()
       cls.children.push({
@@ -1014,8 +1015,13 @@
       const a = document.createElement('a')
       a.href = url
       a.download = '孩子信息导入模板.csv'
+      a.style.display = 'none'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, 200)
     }
     function importChildren(input) {
       const file = input.files[0]
