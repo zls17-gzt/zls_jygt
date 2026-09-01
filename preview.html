@@ -415,6 +415,11 @@
       <p style="font-size:12px;color:var(--muted);margin:8px 0 0">切换班级后，记录、周报、孩子列表会自动跟随切换。</p>
     </div>
     <div class="card">
+      <h3>📋 点名册</h3>
+      <p style="font-size:13px;color:var(--text-light);margin:0 0 10px">为每个孩子记录每日晨、午检体温，并导出Excel表格。</p>
+      <button onclick="openAttendanceModal()" style="background:#E8F5E9;color:#2E7D32;">打开点名册</button>
+    </div>
+    <div class="card">
       <h3>👶 添加孩子</h3>
       <input id="k-name" placeholder="姓名 *">
       <select id="k-gender">
@@ -454,6 +459,24 @@
       <div class="rh-detail-title" id="obs-detail-title">观察记录详情</div>
       <div class="rh-detail-body" id="obs-detail-body"></div>
       <button class="rh-detail-close" onclick="closeObservationHistoryDetail()">关闭</button>
+    </div>
+  </div>
+
+  <!-- 点名册弹窗 -->
+  <div id="attendance-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">📋 点名册</h3>
+        <button onclick="closeAttendanceModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="month" id="attendance-month" onchange="renderAttendanceTable()" style="width:auto;margin:0;">
+        <button onclick="exportAttendanceExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="saveAttendanceData()" style="width:auto;">保存体温</button>
+      </div>
+      <div id="attendance-table-container" style="overflow-x:auto;">
+        <p style="color:var(--muted);font-size:13px;">请选择月份后生成点名册</p>
+      </div>
     </div>
   </div>
 
@@ -1407,6 +1430,151 @@
 
     function closeObservationHistoryDetail() {
       document.getElementById('obs-history-detail').classList.remove('active')
+    }
+
+    /* ============ 点名册 ============ */
+    const ATTENDANCE_KEY = 'jiayuan-attendance'
+    let currentAttendanceMonth = ''
+    let currentAttendanceData = {}
+
+    function openAttendanceModal() {
+      const modal = document.getElementById('attendance-modal')
+      modal.style.display = 'flex'
+      const now = new Date()
+      const monthStr = now.toISOString().slice(0, 7)
+      document.getElementById('attendance-month').value = monthStr
+      currentAttendanceMonth = monthStr
+      renderAttendanceTable()
+    }
+
+    function closeAttendanceModal() {
+      document.getElementById('attendance-modal').style.display = 'none'
+    }
+
+    function getAttendanceData(classId, month) {
+      const all = JSON.parse(localStorage.getItem(ATTENDANCE_KEY) || '{}')
+      return (all[classId] && all[classId][month]) || {}
+    }
+
+    function saveAttendanceData() {
+      const cls = getCurrentClass()
+      const month = document.getElementById('attendance-month').value
+      if (!month) return alert('请选择月份')
+      const children = cls.children || []
+      const data = {}
+      children.forEach(child => {
+        data[child.id] = { am: {}, pm: {} }
+        const inputs = document.querySelectorAll(`[data-attend-child="${child.id}"]`)
+        inputs.forEach(input => {
+          const day = input.dataset.day
+          const period = input.dataset.period
+          const val = input.value.trim()
+          if (val) data[child.id][period][day] = val
+        })
+      })
+      const all = JSON.parse(localStorage.getItem(ATTENDANCE_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(all))
+      alert('体温数据已保存 ✅')
+    }
+
+    function getWorkdays(year, month) {
+      const days = []
+      const d = new Date(year, month - 1, 1)
+      while (d.getMonth() === month - 1) {
+        const dayOfWeek = d.getDay()
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          days.push(d.getDate())
+        }
+        d.setDate(d.getDate() + 1)
+      }
+      return days
+    }
+
+    function renderAttendanceTable() {
+      const container = document.getElementById('attendance-table-container')
+      const cls = getCurrentClass()
+      const children = cls.children || []
+      if (children.length === 0) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">当前班级还没有孩子</p>'
+        return
+      }
+      const monthVal = document.getElementById('attendance-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        return
+      }
+      currentAttendanceMonth = monthVal
+      const [year, month] = monthVal.split('-').map(Number)
+      const workdays = getWorkdays(year, month)
+      const saved = getAttendanceData(cls.id, monthVal)
+
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      html += '<thead><tr style="background:#FFF3E0;">'
+      html += '<th style="border:1px solid #E0C97F;padding:6px;min-width:70px;">姓名</th>'
+      html += '<th style="border:1px solid #E0C97F;padding:6px;min-width:50px;">上/下午</th>'
+      workdays.forEach(day => {
+        html += `<th style="border:1px solid #E0C97F;padding:6px;min-width:50px;">${day}日</th>`
+      })
+      html += '</tr></thead><tbody>'
+
+      children.forEach(child => {
+        const childData = saved[child.id] || { am: {}, pm: {} }
+        ;['am', 'pm'].forEach((period, idx) => {
+          const periodLabel = period === 'am' ? '上午' : '下午'
+          const bg = idx === 0 ? '#FFFBF0' : '#FFFFFF'
+          html += `<tr style="background:${bg};">`
+          if (idx === 0) {
+            html += `<td rowspan="2" style="border:1px solid #E0C97F;padding:6px;text-align:center;font-weight:bold;">${escapeHtml(child.name)}</td>`
+          }
+          html += `<td style="border:1px solid #E0C97F;padding:6px;text-align:center;">${periodLabel}</td>`
+          workdays.forEach(day => {
+            const val = childData[period][day] || ''
+            html += `<td style="border:1px solid #E0C97F;padding:2px;"><input type="text" data-attend-child="${child.id}" data-day="${day}" data-period="${period}" value="${val}" placeholder="℃" style="width:100%;margin:0;padding:4px;border:none;text-align:center;font-size:12px;"></td>`
+          })
+          html += '</tr>'
+        })
+      })
+
+      html += '</tbody></table>'
+      container.innerHTML = html
+    }
+
+    function exportAttendanceExcel() {
+      const cls = getCurrentClass()
+      const children = cls.children || []
+      if (children.length === 0) return alert('当前班级还没有孩子')
+      const monthVal = document.getElementById('attendance-month').value
+      if (!monthVal) return alert('请选择月份')
+      const [year, month] = monthVal.split('-').map(Number)
+      const workdays = getWorkdays(year, month)
+      const saved = getAttendanceData(cls.id, monthVal)
+
+      let csv = '\uFEFF'
+      csv += '临清市第四幼儿园晨、午检记录表\n'
+      csv += `,${cls.name}班,${year}年${month}月\n`
+      csv += ',时间（日）,' + workdays.map(d => d + '日').join(',') + '\n'
+      csv += '姓名,,,' + workdays.map(() => '体温').join(',') + '\n'
+      children.forEach(child => {
+        const childData = saved[child.id] || { am: {}, pm: {} }
+        csv += `,上午,` + workdays.map(d => childData.am[d] || '').join(',') + '\n'
+        csv += `,下午,` + workdays.map(d => childData.pm[d] || '').join(',') + '\n'
+      })
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `点名册-${cls.name}-${year}年${month}月.csv`
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, 200)
+      alert('点名册已导出 ✅')
     }
 
     function genObservation() {
