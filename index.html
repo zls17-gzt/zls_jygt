@@ -1550,23 +1550,63 @@
       const [year, month] = monthVal.split('-').map(Number)
       const workdays = getWorkdays(year, month)
       const saved = getAttendanceData(cls.id, monthVal)
+      const totalCols = 2 + workdays.length
 
-      let csv = '\uFEFF'
-      csv += '临清市第四幼儿园晨、午检记录表\n'
-      csv += `,${cls.name}班,${year}年${month}月\n`
-      csv += ',时间（日）,' + workdays.map(d => d + '日').join(',') + '\n'
-      csv += '姓名,,,' + workdays.map(() => '体温').join(',') + '\n'
+      let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta charset="UTF-8">
+<style>
+  table { border-collapse: collapse; font-family: "宋体", SimSun, serif; font-size: 11pt; }
+  td, th { border: 0.5pt solid #000000; padding: 2pt 4pt; text-align: center; vertical-align: middle; }
+  .title { font-size: 16pt; font-weight: bold; text-align: center; border: none; height: 30pt; }
+  .class-name { text-align: left; border: none; padding-left: 30pt; font-size: 11pt; }
+  .class-month { text-align: left; border: none; font-size: 11pt; }
+  .date-row { background-color: #E2EFDA; }
+  .header-row { background-color: #C6EFCE; font-weight: bold; }
+  .name-cell { background-color: #C6EFCE; font-weight: bold; }
+  .ampm-cell { text-align: center; background-color: #F2F2F2; }
+  tr:nth-child(even).data-pm { background-color: #FAFAFA; }
+</style>
+</head>
+<body>
+<table>`
+
+      // 标题行
+      html += `<tr><td colspan="${totalCols}" class="title">临清市第四幼儿园晨、午检记录表</td></tr>\n`
+
+      // 班级行：模拟原始结构 [空][班名][年月(合并剩余列)]
+      html += `<tr><td style="border:none;"></td><td class="class-name">${cls.name}班</td><td colspan="${totalCols - 2}" class="class-month">${year}年${month}月</td></tr>\n`
+
+      // 日期行
+      html += `<tr class="date-row"><td style="border:none;background:transparent;"></td><td>时间（日）</td>`
+      workdays.forEach(d => { html += `<td>${d}日</td>` })
+      html += `</tr>\n`
+
+      // 表头行
+      html += `<tr class="header-row"><td>姓名</td><td></td>`
+      workdays.forEach(() => { html += `<td>体温</td>` })
+      html += `</tr>\n`
+
+      // 数据行
       children.forEach(child => {
         const childData = saved[child.id] || { am: {}, pm: {} }
-        csv += `,上午,` + workdays.map(d => childData.am[d] || '').join(',') + '\n'
-        csv += `,下午,` + workdays.map(d => childData.pm[d] || '').join(',') + '\n'
+        // 上午行
+        html += `<tr><td rowspan="2" class="name-cell">${child.name}</td><td class="ampm-cell">上午</td>`
+        workdays.forEach(d => { html += `<td>${childData.am[d] || ''}</td>` })
+        html += `</tr>\n`
+        // 下午行
+        html += `<tr class="data-pm"><td class="ampm-cell">下午</td>`
+        workdays.forEach(d => { html += `<td>${childData.pm[d] || ''}</td>` })
+        html += `</tr>\n`
       })
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      html += `</table></body></html>`
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `点名册-${cls.name}-${year}年${month}月.csv`
+      a.download = `点名册-${cls.name}-${year}年${month}月.xls`
       a.style.display = 'none'
       document.body.appendChild(a)
       a.click()
