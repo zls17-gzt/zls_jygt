@@ -2,8 +2,11 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#FFD700">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="家园沟通站">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>家园沟通站</title>
@@ -535,6 +538,85 @@
   </div>
 
   <script>
+    /* ============ B0：localStorage 兼容层（处理 iOS 无痕模式等异常） ============ */
+    const ls = {
+      _ok: null,
+      _check() {
+        if (this._ok !== null) return this._ok
+        try {
+          const testKey = '_test_' + Date.now()
+          ls.setItem(testKey, '1')
+          ls.removeItem(testKey)
+          this._ok = true
+        } catch (e) {
+          this._ok = false
+          console.warn('localStorage 不可用（可能是 iOS 无痕模式）：', e.message)
+        }
+        return this._ok
+      },
+      getItem(key) {
+        if (!this._check()) return null
+        try { return ls.getItem(key) } catch (e) { return null }
+      },
+      setItem(key, val) {
+        if (!this._check()) return false
+        try { ls.setItem(key, val); return true } catch (e) { return false }
+      },
+      removeItem(key) {
+        if (!this._check()) return false
+        try { ls.removeItem(key); return true } catch (e) { return false }
+      }
+    }
+
+    /* ============ B0-2：iOS 兼容辅助函数 ============ */
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+    let _scrollTop = 0
+    function lockBodyScroll() {
+      _scrollTop = window.scrollY || document.documentElement.scrollTop
+      document.body.style.position = 'fixed'
+      document.body.style.top = '-' + _scrollTop + 'px'
+      document.body.style.width = '100%'
+      document.body.style.overflow = 'hidden'
+    }
+    function unlockBodyScroll() {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflow = ''
+      window.scrollTo(0, _scrollTop)
+    }
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob)
+      if (isIOS) {
+        const reader = new FileReader()
+        reader.onload = function () {
+          const win = window.open()
+          if (win) {
+            win.document.write('<html><head><meta charset="utf-8"><title>' + filename + '</title></head><body style="padding:20px;font-family:sans-serif;">')
+            win.document.write('<h2>📎 ' + filename + '</h2>')
+            win.document.write('<p>iOS 上请长按下方内容，选择「全选」→「拷贝」，然后粘贴到备忘录或其他应用中保存。</p>')
+            win.document.write('<hr><pre style="white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;background:#f5f5f5;padding:12px;border-radius:8px;">')
+            win.document.write(reader.result.replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+            win.document.write('</pre></body></html>')
+            win.document.close()
+          }
+          URL.revokeObjectURL(url)
+        }
+        reader.readAsText(blob)
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.style.display = 'none'
+        document.body.appendChild(a)
+        a.click()
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+          URL.revokeObjectURL(url)
+        }, 200)
+      }
+    }
+
     /* ============ B1-3：注册 Service Worker（仅 http(s) 下生效） ============ */
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       window.addEventListener('load', () => {
@@ -578,7 +660,7 @@
     const DAY_NOTES_KEY = 'jiayuan-daynotes'
     function load() {
       try {
-        let db = JSON.parse(localStorage.getItem(STORE_KEY))
+        let db = JSON.parse(ls.getItem(STORE_KEY))
         if (!db || !Array.isArray(db.classes)) {
           const oldChildren = (db && db.children) || []
           const oldRecords = (db && db.records) || []
@@ -613,7 +695,7 @@
       }
       catch (e) { return { classes: [{ id: 'class-' + Date.now(), name: '默认班级', children: [], records: [] }], currentClassId: null, holidays: [] } }
     }
-    function save(db) { localStorage.setItem(STORE_KEY, JSON.stringify(db)) }
+    function save(db) { ls.setItem(STORE_KEY, JSON.stringify(db)) }
     function getCurrentClass() {
       const db = load()
       return db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
@@ -751,7 +833,7 @@
     /* ============ 月历每日笔记 ============ */
     let currentDayNoteDate = ''
     function loadDayNotes() {
-      try { return JSON.parse(localStorage.getItem(DAY_NOTES_KEY)) || {} }
+      try { return JSON.parse(ls.getItem(DAY_NOTES_KEY)) || {} }
       catch (e) { return {} }
     }
     function openDayModal(dateStr, focusNote) {
@@ -776,7 +858,7 @@
       const val = document.getElementById('day-modal-note').value.trim()
       if (val) notes[currentDayNoteDate] = val
       else delete notes[currentDayNoteDate]
-      localStorage.setItem(DAY_NOTES_KEY, JSON.stringify(notes))
+      ls.setItem(DAY_NOTES_KEY, JSON.stringify(notes))
       closeDayModal()
       renderCalendar()
       alert('已保存 ✅')
@@ -1200,7 +1282,7 @@
     }
     // 保存周报到历史
     function saveReportHistory(text, images, isPolished) {
-      const list = JSON.parse(localStorage.getItem(REPORT_HISTORY_KEY) || '[]')
+      const list = JSON.parse(ls.getItem(REPORT_HISTORY_KEY) || '[]')
       list.unshift({
         id: Date.now().toString(),
         childId: currentReportChildId,
@@ -1212,14 +1294,14 @@
       })
       // 最多保留 50 条
       if (list.length > 50) list.length = 50
-      localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(list))
+      ls.setItem(REPORT_HISTORY_KEY, JSON.stringify(list))
       renderReportHistory()
     }
     // 渲染周报历史列表
     function renderReportHistory() {
       const el = document.getElementById('report-history-list')
       if (!el) return
-      const list = JSON.parse(localStorage.getItem(REPORT_HISTORY_KEY) || '[]')
+      const list = JSON.parse(ls.getItem(REPORT_HISTORY_KEY) || '[]')
       if (list.length === 0) {
         el.innerHTML = '<div style="font-size:13px;color:var(--muted)">还没有生成过周报</div>'
         return
@@ -1241,7 +1323,7 @@
     }
     // 查看历史周报详情
     function showReportHistoryDetail(id) {
-      const list = JSON.parse(localStorage.getItem(REPORT_HISTORY_KEY) || '[]')
+      const list = JSON.parse(ls.getItem(REPORT_HISTORY_KEY) || '[]')
       const h = list.find(x => x.id === id)
       if (!h) return
       const date = new Date(h.createdAt).toLocaleString('zh-CN')
@@ -1376,7 +1458,7 @@
     }
 
     function saveObservationHistory(text, images, isPolished) {
-      const list = JSON.parse(localStorage.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      const list = JSON.parse(ls.getItem(OBSERVATION_HISTORY_KEY) || '[]')
       list.unshift({
         id: Date.now().toString(),
         childId: currentObservationChildId,
@@ -1387,14 +1469,14 @@
         createdAt: new Date().toISOString()
       })
       if (list.length > 50) list.length = 50
-      localStorage.setItem(OBSERVATION_HISTORY_KEY, JSON.stringify(list))
+      ls.setItem(OBSERVATION_HISTORY_KEY, JSON.stringify(list))
       renderObservationHistory()
     }
 
     function renderObservationHistory() {
       const el = document.getElementById('obs-history-list')
       if (!el) return
-      const list = JSON.parse(localStorage.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      const list = JSON.parse(ls.getItem(OBSERVATION_HISTORY_KEY) || '[]')
       if (list.length === 0) {
         el.innerHTML = '<div style="font-size:13px;color:var(--muted)">还没有生成过观察记录</div>'
         return
@@ -1416,7 +1498,7 @@
     }
 
     function showObservationHistoryDetail(id) {
-      const list = JSON.parse(localStorage.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      const list = JSON.parse(ls.getItem(OBSERVATION_HISTORY_KEY) || '[]')
       const h = list.find(x => x.id === id)
       if (!h) return
       const date = new Date(h.createdAt).toLocaleString('zh-CN')
@@ -1452,7 +1534,7 @@
     }
 
     function getAttendanceData(classId, month) {
-      const all = JSON.parse(localStorage.getItem(ATTENDANCE_KEY) || '{}')
+      const all = JSON.parse(ls.getItem(ATTENDANCE_KEY) || '{}')
       return (all[classId] && all[classId][month]) || {}
     }
 
@@ -1472,10 +1554,10 @@
           if (val) data[child.id][period][day] = val
         })
       })
-      const all = JSON.parse(localStorage.getItem(ATTENDANCE_KEY) || '{}')
+      const all = JSON.parse(ls.getItem(ATTENDANCE_KEY) || '{}')
       if (!all[cls.id]) all[cls.id] = {}
       all[cls.id][month] = data
-      localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(all))
+      ls.setItem(ATTENDANCE_KEY, JSON.stringify(all))
       alert('体温数据已保存 ✅')
     }
 
@@ -1801,11 +1883,11 @@ ${areaDescs.join('\n')}
     function saveKey() {
       const key = document.getElementById('s-key').value.trim()
       if (!key) return alert('请输入密钥')
-      localStorage.setItem('jiayuan-deepseek-key', key)
+      ls.setItem('jiayuan-deepseek-key', key)
       alert('密钥已保存（仅存本机浏览器）✅')
     }
     function getKey() {
-      return localStorage.getItem('jiayuan-deepseek-key') || ''
+      return ls.getItem('jiayuan-deepseek-key') || ''
     }
     function exportBackup() {
       const db = load()
@@ -1837,7 +1919,7 @@ ${areaDescs.join('\n')}
             input.value = ''
             return
           }
-          localStorage.setItem(STORE_KEY, JSON.stringify(data))
+          ls.setItem(STORE_KEY, JSON.stringify(data))
           renderAll()
           input.value = ''
           alert('备份导入成功 ✅')
