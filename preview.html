@@ -585,6 +585,7 @@
       document.body.style.overflow = ''
       window.scrollTo(0, _scrollTop)
     }
+    // 文件下载兼容（iOS Safari 不支持 a.download）
     function downloadBlob(blob, filename) {
       const url = URL.createObjectURL(blob)
       if (isIOS) {
@@ -607,13 +608,17 @@
         const a = document.createElement('a')
         a.href = url
         a.download = filename
-        a.style.display = 'none'
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
         document.body.appendChild(a)
-        a.click()
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
         setTimeout(() => {
           if (a.parentNode) a.parentNode.removeChild(a)
           URL.revokeObjectURL(url)
-        }, 200)
+        }, 5000)
       }
     }
 
@@ -1420,12 +1425,32 @@
         downloadCanvas(canvas)
       }
     }
-    function downloadCanvas(canvas) {
+    function downloadCanvas(canvas, filename) {
       const url = canvas.toDataURL('image/png')
-      const a = document.createElement('a')
-      a.href = url
-      a.download = '周报-' + new Date().toISOString().slice(0, 10) + '.png'
-      a.click()
+      if (isIOS) {
+        const win = window.open()
+        if (win) {
+          win.document.write('<html><head><meta charset="utf-8"><title>' + (filename || '图片') + '</title><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:20px;text-align:center;background:#222;">')
+          win.document.write('<p style="color:#fff;font-size:14px;margin-bottom:12px;">请长按图片，选择「存储图像」保存到相册</p>')
+          win.document.write('<img src="' + url + '" style="max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);">')
+          win.document.write('</body></html>')
+          win.document.close()
+        }
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename || '周报-' + new Date().toISOString().slice(0, 10) + '.png'
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
+        document.body.appendChild(a)
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+        }, 5000)
+      }
       alert('周报图片已导出 ✅')
     }
     function wrapText(ctx, text, maxWidth) {
@@ -1866,16 +1891,32 @@ ${areaDescs.join('\n')}
     }
 
     function downloadObservationCanvas(canvas) {
+      const filename = '观察记录-' + (currentObservationChildName || '未命名') + '-' + new Date().toISOString().slice(0, 10) + '.png'
       const url = canvas.toDataURL('image/png')
-      const a = document.createElement('a')
-      a.href = url
-      a.download = '观察记录-' + (currentObservationChildName || '未命名') + '-' + new Date().toISOString().slice(0, 10) + '.png'
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => {
-        if (a.parentNode) a.parentNode.removeChild(a)
-      }, 200)
+      if (isIOS) {
+        const win = window.open()
+        if (win) {
+          win.document.write('<html><head><meta charset="utf-8"><title>' + filename + '</title><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:20px;text-align:center;background:#222;">')
+          win.document.write('<p style="color:#fff;font-size:14px;margin-bottom:12px;">请长按图片，选择「存储图像」保存到相册</p>')
+          win.document.write('<img src="' + url + '" style="max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);">')
+          win.document.write('</body></html>')
+          win.document.close()
+        }
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
+        document.body.appendChild(a)
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+        }, 5000)
+      }
       alert('观察记录图片已导出 ✅')
     }
 

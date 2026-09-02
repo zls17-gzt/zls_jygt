@@ -587,7 +587,7 @@
       document.body.style.overflow = ''
       window.scrollTo(0, _scrollTop)
     }
-    // iOS 文件下载兼容（Safari 不支持 a.download）
+    // 文件下载兼容（iOS Safari 不支持 a.download）
     function downloadBlob(blob, filename) {
       const url = URL.createObjectURL(blob)
       if (isIOS) {
@@ -608,17 +608,21 @@
         }
         reader.readAsText(blob)
       } else {
-        // 安卓/桌面：正常下载
+        // 安卓/桌面：挂到 DOM 再模拟真实点击，延长 URL 释放时间
         const a = document.createElement('a')
         a.href = url
         a.download = filename
-        a.style.display = 'none'
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
         document.body.appendChild(a)
-        a.click()
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
         setTimeout(() => {
           if (a.parentNode) a.parentNode.removeChild(a)
           URL.revokeObjectURL(url)
-        }, 200)
+        }, 5000)
       }
     }
 
@@ -1435,7 +1439,16 @@
         const a = document.createElement('a')
         a.href = url
         a.download = filename || '周报-' + new Date().toISOString().slice(0, 10) + '.png'
-        a.click()
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
+        document.body.appendChild(a)
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+        }, 5000)
       }
       alert('周报图片已导出 ✅')
     }
@@ -1886,7 +1899,16 @@ ${areaDescs.join('\n')}
         const a = document.createElement('a')
         a.href = url
         a.download = filename
-        a.click()
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
+        document.body.appendChild(a)
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+        }, 5000)
       }
       alert('观察记录图片已导出 ✅')
     }
