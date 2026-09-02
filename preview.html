@@ -465,6 +465,20 @@
     </div>
   </div>
 
+  <!-- 下载兜底弹窗（安卓/微信浏览器无法自动下载时显示） -->
+  <div id="download-fallback-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:300;padding:16px;align-items:center;justify-content:center;overflow-y:auto;" onclick="if(event.target===this)closeDownloadFallbackModal()">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">📎 文件导出</h3>
+        <button onclick="closeDownloadFallbackModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">当前浏览器不支持自动下载，请长按下方内容 → 全选 → 复制，然后粘贴到备忘录或微信文件传输助手里保存。</p>
+      <div id="download-fallback-filename" style="font-weight:bold;margin-bottom:8px;font-size:14px;"></div>
+      <pre id="download-fallback-content" style="background:#f5f5f5;padding:12px;border-radius:8px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:50vh;overflow-y:auto;border:1px solid #ddd;"></pre>
+      <button onclick="copyDownloadFallbackContent()" style="margin-top:12px;width:100%;background:#E8F5E9;color:#2E7D32;">📋 一键全选复制</button>
+    </div>
+  </div>
+
   <!-- 点名册弹窗 -->
   <div id="attendance-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
     <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
@@ -587,47 +601,68 @@
     }
     // 文件下载兼容（iOS/微信/华为浏览器等不支持 a.download）
     async function downloadBlob(blob, filename) {
-      const file = new File([blob], filename, { type: blob.type })
-
-      // 1) 首选 Web Share API（微信、华为、Chrome 等都支持）
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // 1) 首选 Web Share API
+      if (navigator.canShare) {
         try {
-          await navigator.share({ files: [file], title: filename })
-          return
+          const file = new File([blob], filename, { type: blob.type })
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: filename })
+            return
+          }
         } catch (e) {
           // 用户取消或分享失败，继续尝试
         }
       }
 
+      // 2) 尝试 location.href 直接下载（某些安卓浏览器支持）
       const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.target = '_blank'
+      document.body.appendChild(a)
+      const result = a.click()
+      document.body.removeChild(a)
 
-      if (isIOS) {
-        // iOS：新窗口打开，用户手动保存
-        const reader = new FileReader()
-        reader.onload = function () {
-          const win = window.open()
-          if (win) {
-            win.document.write('<html><head><meta charset="utf-8"><title>' + filename + '</title></head><body style="padding:20px;font-family:sans-serif;">')
-            win.document.write('<h2>📎 ' + filename + '</h2>')
-            win.document.write('<p>iOS 上请长按下方内容，选择「全选」→「拷贝」，然后粘贴到备忘录或其他应用中保存。</p>')
-            win.document.write('<hr><pre style="white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.6;background:#f5f5f5;padding:12px;border-radius:8px;">')
-            win.document.write(reader.result.replace(/</g, '&lt;').replace(/>/g, '&gt;'))
-            win.document.write('</pre></body></html>')
-            win.document.close()
-          }
-          URL.revokeObjectURL(url)
-        }
-        reader.readAsText(blob)
-      } else {
-        // 安卓：用 iframe 加载 blob URL 触发下载（比 window.open 更不容易被拦截）
-        const iframe = document.createElement('iframe')
-        iframe.src = url
-        iframe.style.display = 'none'
-        document.body.appendChild(iframe)
-        setTimeout(() => {
-          if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
-          URL.revokeObjectURL(url)
-        }, 10000)
+      // 给一个短暂的延迟，如果浏览器支持 a.download，应该已经开始下载了
+      await new Promise(r => setTimeout(r, 800))
+
+      // 3) 兜底：显示弹窗让用户手动复制
+      showDownloadFallbackModal(blob, filename)
+      URL.revokeObjectURL(url)
+    }
+
+    // 下载兜底弹窗
+    function showDownloadFallbackModal(blob, filename) {
+      const modal = document.getElementById('download-fallback-modal')
+      const titleEl = document.getElementById('download-fallback-filename')
+      const contentEl = document.getElementById('download-fallback-content')
+      titleEl.textContent = filename
+      modal.style.display = 'flex'
+      lockBodyScroll()
+
+      const reader = new FileReader()
+      reader.onload = function () {
+        contentEl.textContent = reader.result
+      }
+      reader.readAsText(blob)
+    }
+    function closeDownloadFallbackModal() {
+      document.getElementById('download-fallback-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function copyDownloadFallbackContent() {
+      const contentEl = document.getElementById('download-fallback-content')
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(contentEl)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      try {
+        document.execCommand('copy')
+        alert('内容已复制到剪贴板 ✅\n请粘贴到备忘录或微信文件传输助手保存')
+      } catch (e) {
+        alert('复制失败，请手动长按内容 → 全选 → 复制')
       }
     }
 
@@ -1939,20 +1974,10 @@ ${areaDescs.join('\n')}
     function getKey() {
       return ls.getItem('jiayuan-deepseek-key') || ''
     }
-    function exportBackup() {
+    async function exportBackup() {
       const db = load()
       const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'jiayuan-backup-' + new Date().toISOString().slice(0, 10) + '.json'
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => {
-        if (a.parentNode) a.parentNode.removeChild(a)
-        URL.revokeObjectURL(url)
-      }, 200)
+      await downloadBlob(blob, 'jiayuan-backup-' + new Date().toISOString().slice(0, 10) + '.json')
       alert('已导出备份文件 ✅')
     }
     function importBackup(input) {
