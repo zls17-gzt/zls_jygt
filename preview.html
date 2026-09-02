@@ -1552,50 +1552,70 @@
       const saved = getAttendanceData(cls.id, monthVal)
       const totalCols = 2 + workdays.length
 
+      // 列宽定义（像素，基于原始 xls 的 width/256*10 换算）
+      const colNameW = 74
+      const colAmpmW = 71
+      const colDateW = 50
+
       let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:x="urn:schemas-microsoft-com:office:excel">
 <head><meta charset="UTF-8">
 <style>
-  table { border-collapse: collapse; font-family: "宋体", SimSun, serif; font-size: 11pt; }
-  td, th { border: 0.5pt solid #000000; padding: 2pt 4pt; text-align: center; vertical-align: middle; }
-  .title { font-size: 16pt; font-weight: bold; text-align: center; border: none; height: 30pt; }
-  .class-name { text-align: left; border: none; padding-left: 30pt; font-size: 11pt; }
-  .class-month { text-align: left; border: none; font-size: 11pt; }
-  .date-row { background-color: #E2EFDA; }
-  .header-row { background-color: #C6EFCE; font-weight: bold; }
-  .name-cell { background-color: #C6EFCE; font-weight: bold; }
-  .ampm-cell { text-align: center; background-color: #F2F2F2; }
-  tr:nth-child(even).data-pm { background-color: #FAFAFA; }
+  table { border-collapse: collapse; font-family: "宋体", SimSun, serif; mso-font-alt: "SimSun"; }
+  td, th { mso-number-format: "\\@"; padding: 0; }
+  /* 标题行：高26pt，宋体20pt，居中，无边框 */
+  .r-title { height: 26pt; }
+  .r-title td { font-size: 20pt; text-align: center; vertical-align: middle; border: none; }
+  /* 班级行：高21pt，宋体14pt，居中，无边框 */
+  .r-class { height: 21pt; }
+  .r-class td { font-size: 14pt; text-align: center; vertical-align: middle; border: none; }
+  /* 日期行/表头行/数据行：高15pt，宋体12pt，垂直居中，细黑边框 */
+  .r-date, .r-header, .r-data { height: 15pt; }
+  .r-date td, .r-header td, .r-data td {
+    font-size: 12pt; vertical-align: middle;
+    border: 0.5pt solid #000000; text-align: right;
+  }
+  /* 左对齐的特殊单元格 */
+  .r-date td:nth-child(2), .r-header td:first-child { text-align: left; }
+  /* 列宽 */
+  .col-name { width: ${colNameW}px; }
+  .col-ampm { width: ${colAmpmW}px; }
+  .col-day { width: ${colDateW}px; }
 </style>
 </head>
 <body>
 <table>`
 
+      // colgroup 定义列宽
+      html += `<colgroup><col class="col-name"><col class="col-ampm">`
+      workdays.forEach(() => { html += `<col class="col-day">` })
+      html += `</colgroup>\n`
+
       // 标题行
-      html += `<tr><td colspan="${totalCols}" class="title">临清市第四幼儿园晨、午检记录表</td></tr>\n`
+      html += `<tr class="r-title"><td colspan="${totalCols}">临清市第四幼儿园晨、午检记录表</td></tr>\n`
 
-      // 班级行：模拟原始结构 [空][班名][年月(合并剩余列)]
-      html += `<tr><td style="border:none;"></td><td class="class-name">${cls.name}班</td><td colspan="${totalCols - 2}" class="class-month">${year}年${month}月</td></tr>\n`
+      // 班级行：[空][班级名+年月（合并剩余列）]
+      html += `<tr class="r-class"><td></td><td colspan="${totalCols - 1}">${cls.name}班&nbsp;&nbsp;&nbsp;&nbsp;${year}年${month}月</td></tr>\n`
 
-      // 日期行
-      html += `<tr class="date-row"><td style="border:none;background:transparent;"></td><td>时间（日）</td>`
+      // 日期行：[空][时间（日）][1日][2日]...
+      html += `<tr class="r-date"><td></td><td>时间（日）</td>`
       workdays.forEach(d => { html += `<td>${d}日</td>` })
       html += `</tr>\n`
 
-      // 表头行
-      html += `<tr class="header-row"><td>姓名</td><td></td>`
+      // 表头行：[姓名][空][体温][体温]...
+      html += `<tr class="r-header"><td>姓名</td><td></td>`
       workdays.forEach(() => { html += `<td>体温</td>` })
       html += `</tr>\n`
 
       // 数据行
       children.forEach(child => {
         const childData = saved[child.id] || { am: {}, pm: {} }
-        // 上午行
-        html += `<tr><td rowspan="2" class="name-cell">${child.name}</td><td class="ampm-cell">上午</td>`
+        // 上午行：[姓名 rowspan=2][上午][数据]...
+        html += `<tr class="r-data"><td rowspan="2">${child.name}</td><td>上午</td>`
         workdays.forEach(d => { html += `<td>${childData.am[d] || ''}</td>` })
         html += `</tr>\n`
-        // 下午行
-        html += `<tr class="data-pm"><td class="ampm-cell">下午</td>`
+        // 下午行：[合并][下午][数据]...
+        html += `<tr class="r-data"><td>下午</td>`
         workdays.forEach(d => { html += `<td>${childData.pm[d] || ''}</td>` })
         html += `</tr>\n`
       })
