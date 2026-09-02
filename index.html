@@ -1557,66 +1557,54 @@
       const colAmpmW = 71
       const colDateW = 50
 
+      // 样式辅助函数
+      const TD = (content, opts = {}) => {
+        const style = []
+        if (opts.fs) style.push(`font-size:${opts.fs}pt`)
+        if (opts.h) style.push(`height:${opts.h}pt`)
+        if (opts.w) style.push(`width:${opts.w}px`)
+        if (opts.bd) style.push('border:0.5pt solid #000000')
+        if (opts.bd === false) style.push('border:none')
+        if (opts.ta) style.push(`text-align:${opts.ta}`)
+        if (opts.va) style.push(`vertical-align:${opts.va}`)
+        if (opts.rs) return `<td rowspan="${opts.rs}" style="${style.join(';')};font-family:宋体,SimSun">${content}</td>`
+        if (opts.cs) return `<td colspan="${opts.cs}" style="${style.join(';')};font-family:宋体,SimSun">${content}</td>`
+        return `<td style="${style.join(';')};font-family:宋体,SimSun">${content}</td>`
+      }
+
       let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:x="urn:schemas-microsoft-com:office:excel">
 <head><meta charset="UTF-8">
-<style>
-  table { border-collapse: collapse; font-family: "宋体", SimSun, serif; mso-font-alt: "SimSun"; }
-  td, th { mso-number-format: "\\@"; padding: 0; }
-  /* 标题行：高26pt，宋体20pt，居中，无边框 */
-  .r-title { height: 26pt; }
-  .r-title td { font-size: 20pt; text-align: center; vertical-align: middle; border: none; }
-  /* 班级行：高21pt，宋体14pt，居中，无边框 */
-  .r-class { height: 21pt; }
-  .r-class td { font-size: 14pt; text-align: center; vertical-align: middle; border: none; }
-  /* 日期行/表头行/数据行：高15pt，宋体12pt，垂直居中，细黑边框 */
-  .r-date, .r-header, .r-data { height: 15pt; }
-  .r-date td, .r-header td, .r-data td {
-    font-size: 12pt; vertical-align: middle;
-    border: 0.5pt solid #000000; text-align: right;
-  }
-  /* 左对齐的特殊单元格 */
-  .r-date td:nth-child(2), .r-header td:first-child { text-align: left; }
-  /* 列宽 */
-  .col-name { width: ${colNameW}px; }
-  .col-ampm { width: ${colAmpmW}px; }
-  .col-day { width: ${colDateW}px; }
-</style>
 </head>
 <body>
-<table>`
+<table style="border-collapse:collapse;font-family:宋体,SimSun">`
 
-      // colgroup 定义列宽
-      html += `<colgroup><col class="col-name"><col class="col-ampm">`
-      workdays.forEach(() => { html += `<col class="col-day">` })
-      html += `</colgroup>\n`
+      // 标题行：高26pt，宋体20pt，居中，无边框
+      html += `<tr>${TD('临清市第四幼儿园晨、午检记录表', { cs: totalCols, fs: 20, h: 26, ta: 'center', va: 'middle', bd: false })}</tr>\n`
 
-      // 标题行
-      html += `<tr class="r-title"><td colspan="${totalCols}">临清市第四幼儿园晨、午检记录表</td></tr>\n`
+      // 班级行：高21pt，宋体14pt，居中，无边框
+      html += `<tr>${TD('', { w: colNameW, fs: 14, h: 21, bd: false })}${TD(`${cls.name}班&nbsp;&nbsp;&nbsp;&nbsp;${year}年${month}月`, { cs: totalCols - 1, fs: 14, h: 21, ta: 'center', va: 'middle', bd: false })}</tr>\n`
 
-      // 班级行：[空][班级名+年月（合并剩余列）]
-      html += `<tr class="r-class"><td></td><td colspan="${totalCols - 1}">${cls.name}班&nbsp;&nbsp;&nbsp;&nbsp;${year}年${month}月</td></tr>\n`
-
-      // 日期行：[空][时间（日）][1日][2日]...
-      html += `<tr class="r-date"><td></td><td>时间（日）</td>`
-      workdays.forEach(d => { html += `<td>${d}日</td>` })
+      // 日期行：高15pt，宋体12pt
+      html += `<tr>${TD('', { w: colNameW, fs: 12, h: 15, bd: false })}${TD('时间（日）', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle' })}`
+      workdays.forEach(d => { html += TD(`${d}日`, { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
       html += `</tr>\n`
 
-      // 表头行：[姓名][空][体温][体温]...
-      html += `<tr class="r-header"><td>姓名</td><td></td>`
-      workdays.forEach(() => { html += `<td>体温</td>` })
+      // 表头行：高15pt，宋体12pt
+      html += `<tr>${TD('姓名', { w: colNameW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle' })}${TD('', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
+      workdays.forEach(() => { html += TD('体温', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
       html += `</tr>\n`
 
-      // 数据行
+      // 数据行：高15pt，宋体12pt
       children.forEach(child => {
         const childData = saved[child.id] || { am: {}, pm: {} }
-        // 上午行：[姓名 rowspan=2][上午][数据]...
-        html += `<tr class="r-data"><td rowspan="2">${child.name}</td><td>上午</td>`
-        workdays.forEach(d => { html += `<td>${childData.am[d] || ''}</td>` })
+        // 上午行
+        html += `<tr>${TD(child.name, { w: colNameW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle', rs: 2 })}${TD('上午', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
+        workdays.forEach(d => { html += TD(childData.am[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
         html += `</tr>\n`
-        // 下午行：[合并][下午][数据]...
-        html += `<tr class="r-data"><td>下午</td>`
-        workdays.forEach(d => { html += `<td>${childData.pm[d] || ''}</td>` })
+        // 下午行
+        html += `<tr>${TD('下午', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
+        workdays.forEach(d => { html += TD(childData.pm[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
         html += `</tr>\n`
       })
 
