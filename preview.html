@@ -589,13 +589,13 @@
     async function downloadBlob(blob, filename) {
       const file = new File([blob], filename, { type: blob.type })
 
-      // 1) 首选 Web Share API（微信、华为、Chrome 等都支持，可直接分享到文件传输助手或保存）
+      // 1) 首选 Web Share API（微信、华为、Chrome 等都支持）
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: filename })
           return
         } catch (e) {
-          // 用户取消或分享失败，继续尝试其他方式
+          // 用户取消或分享失败，继续尝试
         }
       }
 
@@ -619,22 +619,15 @@
         }
         reader.readAsText(blob)
       } else {
-        // 安卓/桌面：先尝试 window.open 触发下载，再兜底 a.click
-        const opened = window.open(url, '_blank')
-        if (!opened || opened.closed || typeof opened.closed === 'undefined') {
-          // 被拦截，fallback 到 a.click
-          const a = document.createElement('a')
-          a.href = url
-          a.download = filename
-          a.style.position = 'fixed'
-          a.style.top = '-9999px'
-          a.style.left = '-9999px'
-          document.body.appendChild(a)
-          const evt = document.createEvent('MouseEvents')
-          evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
-          a.dispatchEvent(evt)
-        }
-        setTimeout(() => { URL.revokeObjectURL(url) }, 10000)
+        // 安卓：用 iframe 加载 blob URL 触发下载（比 window.open 更不容易被拦截）
+        const iframe = document.createElement('iframe')
+        iframe.src = url
+        iframe.style.display = 'none'
+        document.body.appendChild(iframe)
+        setTimeout(() => {
+          if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+          URL.revokeObjectURL(url)
+        }, 10000)
       }
     }
 
