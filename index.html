@@ -474,7 +474,7 @@
         <button onclick="exportAttendanceExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
         <button onclick="saveAttendanceData()" style="width:auto;">保存体温</button>
       </div>
-      <div id="attendance-table-container" style="overflow-x:auto;">
+      <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成点名册</p>
       </div>
     </div>
@@ -1510,12 +1510,12 @@
       const workdays = getWorkdays(year, month)
       const saved = getAttendanceData(cls.id, monthVal)
 
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      let html = '<table style="border-collapse:collapse;font-size:12px;white-space:nowrap;">'
       html += '<thead><tr style="background:#FFF3E0;">'
-      html += '<th style="border:1px solid #E0C97F;padding:6px;min-width:70px;">姓名</th>'
-      html += '<th style="border:1px solid #E0C97F;padding:6px;min-width:50px;">上/下午</th>'
+      html += '<th style="border:1px solid #E0C97F;padding:4px;min-width:56px;">姓名</th>'
+      html += '<th style="border:1px solid #E0C97F;padding:4px;min-width:36px;">上/下午</th>'
       workdays.forEach(day => {
-        html += `<th style="border:1px solid #E0C97F;padding:6px;min-width:50px;">${day}日</th>`
+        html += `<th style="border:1px solid #E0C97F;padding:4px;min-width:34px;font-size:11px;">${day}日</th>`
       })
       html += '</tr></thead><tbody>'
 
@@ -1526,12 +1526,12 @@
           const bg = idx === 0 ? '#FFFBF0' : '#FFFFFF'
           html += `<tr style="background:${bg};">`
           if (idx === 0) {
-            html += `<td rowspan="2" style="border:1px solid #E0C97F;padding:6px;text-align:center;font-weight:bold;">${escapeHtml(child.name)}</td>`
+            html += `<td rowspan="2" style="border:1px solid #E0C97F;padding:4px;text-align:center;font-weight:bold;font-size:12px;">${escapeHtml(child.name)}</td>`
           }
-          html += `<td style="border:1px solid #E0C97F;padding:6px;text-align:center;">${periodLabel}</td>`
+          html += `<td style="border:1px solid #E0C97F;padding:4px;text-align:center;font-size:11px;">${periodLabel}</td>`
           workdays.forEach(day => {
             const val = childData[period][day] || ''
-            html += `<td style="border:1px solid #E0C97F;padding:2px;"><input type="text" data-attend-child="${child.id}" data-day="${day}" data-period="${period}" value="${val}" placeholder="℃" style="width:100%;margin:0;padding:4px;border:none;text-align:center;font-size:12px;"></td>`
+            html += `<td style="border:1px solid #E0C97F;padding:2px;"><input type="text" data-attend-child="${child.id}" data-day="${day}" data-period="${period}" value="${val}" placeholder="℃" style="width:100%;margin:0;padding:2px;border:none;text-align:center;font-size:11px;box-sizing:border-box;"></td>`
           })
           html += '</tr>'
         })
