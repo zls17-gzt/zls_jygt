@@ -539,8 +539,8 @@
   </div>
 
   <!-- 点名册弹窗 -->
-  <div id="attendance-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
-    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;min-width:0;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+  <div id="attendance-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:flex-start;justify-content:center;overflow-y:auto;padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px) + 80px);">
+    <div style="background:var(--card);border-radius:16px;padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px) + 80px);max-width:960px;min-width:0;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">📋 点名册</h3>
         <button onclick="closeAttendanceModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>

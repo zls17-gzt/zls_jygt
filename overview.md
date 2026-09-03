@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v44**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v45**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -26,6 +26,13 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 弹窗内容区改为顶部对齐（`align-items:flex-start`），长表格可从顶部自然向下滚动。
 - 解决华为浏览器等机型中，弹窗最下方的「说明」文字被底部浏览器导航栏盖住的问题。
 - `sw.js` 升级到 v44。
+
+## 本次改动（v45 · 点名册弹窗补上同样的底部留白）
+
+- 点名册弹窗（`attendance-modal`）此前未应用 v44 的修复，在华为浏览器底部同样被导航栏遮挡。
+- 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
+- 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
+- `sw.js` 升级到 v45。
 
 ## 本次改动（v20 · 左侧边栏改回底部 Tab 栏）
 
@@ -53,7 +60,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（底部 Tab 栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v44） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v45） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |
