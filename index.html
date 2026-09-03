@@ -285,6 +285,50 @@
     .app-header { left: 0; }
     .page { padding: 86px 16px 90px; }
     body { padding-bottom: 0; }
+
+    /* ===== 园所表格（观察表 / 消毒记录表 / 交接班表） ===== */
+    .formtable { border-collapse: collapse; font-size: 12px; background: #fff; }
+    .formtable th, .formtable td {
+      border: 1px solid #E0C97F; padding: 2px 3px; text-align: center; vertical-align: middle;
+    }
+    .formtable th { background: #FFF3E0; font-weight: 600; color: var(--text); line-height: 1.25; }
+    .formtable .ft-title {
+      font-size: 16px; font-weight: bold; padding: 10px 4px; border: none; background: #fff;
+    }
+    .formtable .ft-group { background: #FFF8E1; font-weight: 600; }
+    .formtable .ft-note {
+      border: none; text-align: left; color: var(--muted); font-size: 11px; line-height: 1.5;
+      padding: 8px 2px 0; background: #fff; white-space: normal;
+    }
+    .formtable input {
+      width: 100%; margin: 0; padding: 4px 3px; border: none; background: transparent;
+      font-size: 12px; text-align: center; box-sizing: border-box; -webkit-appearance: none;
+      border-radius: 0; font-family: inherit; color: var(--text);
+    }
+    .formtable input:focus { outline: none; background: #FFFDE7; }
+    .formtable textarea {
+      width: 100%; margin: 0; padding: 4px; border: 1px solid #E0C97F; border-radius: 6px;
+      font-size: 12px; box-sizing: border-box; font-family: inherit; color: var(--text); background: #FFFDF5;
+    }
+    .formtable .cell-sq { cursor: pointer; user-select: none; -webkit-user-select: none; min-width: 30px; }
+    .formtable .cell-sq.on { color: #C62828; font-weight: bold; }
+    .formtable .c-date { min-width: 58px; white-space: nowrap; background: #FFFBF0; }
+    .formtable .c-sign { min-width: 76px; }
+    .formtable .c-txt { min-width: 150px; text-align: left; }
+    .formtable .c-txt input { text-align: left; }
+    .chipbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 3px; background: #FFF3E0; color: #8D6E63;
+      border-radius: 999px; padding: 3px 3px 3px 10px; font-size: 12px; line-height: 20px;
+    }
+    .chip button {
+      border: none; background: rgba(0,0,0,.10); color: #8D6E63; width: 18px; height: 18px;
+      line-height: 1; border-radius: 50%; cursor: pointer; font-size: 13px; padding: 0; margin: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .datebar-input { width: auto; margin: 0; padding: 4px 6px; font-size: 12px; }
+    .datebar-btn { width: auto; padding: 5px 10px; font-size: 12px; background: #FFF3E0; color: #8D6E63; }
+    .datebar-btn.gray { background: #EFEFEF; color: #5D4037; }
   </style>
 </head>
 <body>
@@ -423,6 +467,21 @@
       <button onclick="openAttendanceModal()" style="background:#E8F5E9;color:#2E7D32;">打开点名册</button>
     </div>
     <div class="card">
+      <h3>👀 全日制观察记录表</h3>
+      <p style="font-size:13px;color:var(--text-light);margin:0 0 10px">按日记录幼儿情况（请假、生病、早接、状态、大便等）与记录教师，可导出 Excel。</p>
+      <button onclick="openObsFormModal()" style="background:#E3F2FD;color:#1565C0;">打开观察表</button>
+    </div>
+    <div class="card">
+      <h3>🧴 通风消毒记录表</h3>
+      <p style="font-size:13px;color:var(--text-light);margin:0 0 10px">按日打卡教室通风与各类设施消毒，点一下即可打「√」，可导出 Excel。</p>
+      <button onclick="openDisModal()" style="background:#F3E5F5;color:#6A1B9A;">打开消毒记录表</button>
+    </div>
+    <div class="card">
+      <h3>🔁 交接班记录表</h3>
+      <p style="font-size:13px;color:var(--text-light);margin:0 0 10px">记录每日应到 / 实到 / 缺勤人数、幼儿在园情况及交班、接班教师，可导出 Excel。</p>
+      <button onclick="openHanModal()" style="background:#FFF3E0;color:#E65100;">打开交接班表</button>
+    </div>
+    <div class="card">
       <h3>👶 添加孩子</h3>
       <input id="k-name" placeholder="姓名 *">
       <select id="k-gender">
@@ -493,6 +552,64 @@
       </div>
       <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成点名册</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全日制观察记录表弹窗 -->
+  <div id="obs-form-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">👀 全日制观察记录表</h3>
+        <button onclick="closeObsFormModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="month" id="obs-form-month" onchange="renderObsForm()" style="width:auto;margin:0;">
+        <button onclick="exportObsFormExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="saveObsForm()" style="width:auto;">保存</button>
+      </div>
+      <div id="obs-form-dates"></div>
+      <div id="obs-form-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <p style="color:var(--muted);font-size:13px;">请选择月份后生成观察表</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通风消毒记录表弹窗 -->
+  <div id="dis-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:1100px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">🧴 通风消毒记录表</h3>
+        <button onclick="closeDisModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="month" id="dis-month" onchange="renderDis()" style="width:auto;margin:0;">
+        <button onclick="exportDisExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="saveDis()" style="width:auto;">保存</button>
+      </div>
+      <div id="dis-dates"></div>
+      <div id="dis-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <p style="color:var(--muted);font-size:13px;">请选择月份后生成消毒记录表</p>
+      </div>
+      <p id="dis-note" style="font-size:11px;color:var(--muted);line-height:1.6;margin:10px 0 0;"></p>
+    </div>
+  </div>
+
+  <!-- 交接班记录表弹窗 -->
+  <div id="han-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">🔁 交接班记录表</h3>
+        <button onclick="closeHanModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="month" id="han-month" onchange="renderHan()" style="width:auto;margin:0;">
+        <button onclick="exportHanExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="saveHan()" style="width:auto;">保存</button>
+      </div>
+      <div id="han-dates"></div>
+      <div id="han-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <p style="color:var(--muted);font-size:13px;">请选择月份后生成交接班表</p>
       </div>
     </div>
   </div>
@@ -1765,6 +1882,464 @@
       const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
       downloadBlob(blob, `点名册-${cls.name}-${year}年${month}月.xls`)
       alert('点名册已导出 ✅')
+    }
+
+    /* ================= 园所表格公共：园历日期 + Excel 导出样式 ================= */
+    const TABLEDATES_KEY = 'jiayuan-table-dates'
+
+    function localMonthStr() {
+      const d = new Date()
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+    }
+    function getTableDates(cls, monthVal) {
+      const all = JSON.parse(ls.getItem(TABLEDATES_KEY) || '{}')
+      const d = (all[cls.id] && all[cls.id][monthVal]) || null
+      return (d && d.length) ? d.slice().sort((a, b) => a - b) : null
+    }
+    function saveTableDates(cls, monthVal, days) {
+      const all = JSON.parse(ls.getItem(TABLEDATES_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      if (days === null) delete all[cls.id][monthVal]
+      else all[cls.id][monthVal] = days.slice().sort((a, b) => a - b)
+      ls.setItem(TABLEDATES_KEY, JSON.stringify(all))
+    }
+    // 优先用本班本月自定义的园历日期，没有则默认周一至周五
+    function resolveDates(cls, monthVal) {
+      const custom = getTableDates(cls, monthVal)
+      if (custom) return custom
+      const [y, m] = monthVal.split('-').map(Number)
+      return getWorkdays(y, m)
+    }
+    function renderDateBar(formKey) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      if (!monthVal) return ''
+      const [, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      let h = '<div class="chipbar"><span style="font-size:12px;color:var(--muted)">园历日期（' + days.length + ' 天）：</span>'
+      days.forEach(d => {
+        h += '<span class="chip">' + m + '月' + d + '日<button onclick="removeTableDate(\'' + formKey + '\',' + d + ')" title="删除这天">×</button></span>'
+      })
+      h += '<input type="date" id="' + formKey + '-adddate" class="datebar-input">'
+      h += '<button class="datebar-btn" onclick="addTableDate(\'' + formKey + '\')">＋加这天</button>'
+      h += '<button class="datebar-btn gray" onclick="resetTableDates(\'' + formKey + '\')">↺恢复周一至周五</button>'
+      h += '</div>'
+      return h
+    }
+    function addTableDate(formKey) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      const v = document.getElementById(formKey + '-adddate').value
+      if (!v) return alert('请先在日期框里选择要添加的日子')
+      const [y, m, d] = v.split('-').map(Number)
+      if (y + '-' + String(m).padStart(2, '0') !== monthVal) return alert('请添加 ' + monthVal + ' 当月内的日期')
+      const days = resolveDates(cls, monthVal)
+      if (days.indexOf(d) === -1) days.push(d)
+      saveTableDates(cls, monthVal, days)
+      rerenderForm(formKey)
+    }
+    function removeTableDate(formKey, d) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      saveTableDates(cls, monthVal, resolveDates(cls, monthVal).filter(x => x !== d))
+      rerenderForm(formKey)
+    }
+    function resetTableDates(formKey) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      if (!confirm('恢复为「周一至周五」，将清除本班本月的自定义日期。已填写的内容不会丢失，继续？')) return
+      saveTableDates(cls, monthVal, null)
+      rerenderForm(formKey)
+    }
+    function rerenderForm(formKey) {
+      if (formKey === 'obs-form') renderObsForm()
+      else if (formKey === 'dis') renderDis()
+      else if (formKey === 'han') renderHan()
+    }
+
+    // 导出用单元格：精确控制字体、字号、行高、列宽、边框、对齐
+    function xTd(content, o) {
+      o = o || {}
+      const s = []
+      s.push('font-family:' + (o.ff || '宋体,SimSun'))
+      s.push('font-size:' + (o.fs || 12) + 'pt')
+      if (o.h) s.push('height:' + o.h + 'pt')
+      if (o.w) s.push('width:' + o.w + 'px')
+      if (o.bd === false) s.push('border:none')
+      else if (o.bd === 'top') s.push('border-top:0.5pt solid #000000;border-left:none;border-right:none;border-bottom:none')
+      else s.push('border:0.5pt solid #000000')
+      s.push('text-align:' + (o.ta || 'center'))
+      s.push('vertical-align:' + (o.va || 'middle'))
+      s.push(o.nowrap ? 'white-space:nowrap' : 'white-space:normal')
+      let attr = ''
+      if (o.rs) attr += ' rowspan="' + o.rs + '"'
+      if (o.cs) attr += ' colspan="' + o.cs + '"'
+      return '<td' + attr + ' style="' + s.join(';') + '">' + content + '</td>'
+    }
+    function xlsColGroup(widths) {
+      return '<colgroup>' + widths.map(w => '<col style="width:' + w + 'px">').join('') + '</colgroup>'
+    }
+    function xlsDoc(tableHtml) {
+      return '<html xmlns:o="urn:schemas-microsoft-com:office:office"\n      xmlns:x="urn:schemas-microsoft-com:office:excel">\n<head><meta charset="UTF-8">\n</head>\n<body>\n' + tableHtml + '\n</body></html>'
+    }
+
+    /* ================= 全日制观察记录表 ================= */
+    const OBSFORM_KEY = 'jiayuan-obsform'
+    // 列宽（px）：A列沿用原始 xls 默认宽 ≈64px，B~R 合并为「幼儿情况」，S 列 78px
+    const OBS_W = [64, 45, 52, 49, 50, 55, 60, 57, 45, 56, 51, 50, 51, 47, 51, 44, 41, 70, 78]
+
+    function openObsFormModal() {
+      document.getElementById('obs-form-modal').style.display = 'flex'
+      lockBodyScroll()
+      document.getElementById('obs-form-month').value = localMonthStr()
+      renderObsForm()
+    }
+    function closeObsFormModal() {
+      document.getElementById('obs-form-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function getObsFormData(cls, month) {
+      const all = JSON.parse(ls.getItem(OBSFORM_KEY) || '{}')
+      return (all[cls.id] && all[cls.id][month]) || {}
+    }
+    function saveObsForm(silent) {
+      const cls = getCurrentClass()
+      const month = document.getElementById('obs-form-month').value
+      if (!month) return alert('请选择月份')
+      const data = {}
+      document.querySelectorAll('[data-obs-note]').forEach(el => {
+        const d = el.dataset.obsNote
+        data[d] = data[d] || {}
+        data[d].note = el.value
+      })
+      document.querySelectorAll('[data-obs-teacher]').forEach(el => {
+        const d = el.dataset.obsTeacher
+        data[d] = data[d] || {}
+        data[d].teacher = el.value
+      })
+      const footEl = document.querySelector('[data-obs-foot]')
+      if (footEl) data.__foot = footEl.value
+      const all = JSON.parse(ls.getItem(OBSFORM_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(OBSFORM_KEY, JSON.stringify(all))
+      if (!silent) alert('全日制观察记录表已保存 ✅')
+    }
+    function renderObsForm() {
+      const container = document.getElementById('obs-form-table-container')
+      const bar = document.getElementById('obs-form-dates')
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('obs-form-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        bar.innerHTML = ''
+        return
+      }
+      const [, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getObsFormData(cls, monthVal)
+      let h = '<table class="formtable" style="min-width:420px;width:100%;">'
+      h += '<tr><th style="min-width:64px">日期</th><th colspan="17" style="min-width:200px">幼儿情况（请假、生病、早接、状态、大便等）</th><th style="min-width:86px">记录教师</th></tr>'
+      days.forEach(d => {
+        const r = data[d] || {}
+        h += '<tr>'
+        h += '<td class="c-date">' + m + '月' + d + '日</td>'
+        h += '<td class="c-txt" colspan="17"><input type="text" data-obs-note="' + d + '" value="' + escapeHtml(r.note || '') + '" placeholder="填写幼儿情况"></td>'
+        h += '<td class="c-sign"><input type="text" data-obs-teacher="' + d + '" value="' + escapeHtml(r.teacher || '') + '" placeholder="签字"></td>'
+        h += '</tr>'
+      })
+      h += '</table>'
+      h += '<div style="margin-top:12px;"><label style="font-size:12px;color:var(--muted);">表尾备注（会一并导出到表格最下方，可留空）</label>'
+      h += '<textarea data-obs-foot rows="2" placeholder="表尾备注">' + escapeHtml(data.__foot || '') + '</textarea></div>'
+      container.innerHTML = h
+      bar.innerHTML = renderDateBar('obs-form')
+    }
+    function exportObsFormExcel() {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('obs-form-month').value
+      if (!monthVal) return alert('请选择月份')
+      saveObsForm(true)
+      const [year, month] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getObsFormData(cls, monthVal)
+      let h = '<table style="border-collapse:collapse;">'
+      h += xlsColGroup(OBS_W)
+      // 标题：高37pt，宋体20pt，居中，无边框
+      h += '<tr>' + xTd('临清市第四幼儿园（' + year + '年&nbsp;&nbsp;&nbsp;&nbsp;' + escapeHtml(cls.name) + '班 ）全日制观察记录表', { cs: 19, fs: 20, h: 37, bd: false, nowrap: true }) + '</tr>'
+      // 空行：高26pt，仅上边框
+      h += '<tr>' + OBS_W.map(w => xTd('', { w: w, fs: 12, h: 26, bd: 'top' })).join('') + '</tr>'
+      // 表头：高37pt，宋体12pt
+      h += '<tr>' + xTd('日期', { w: OBS_W[0], fs: 12, h: 37, nowrap: true })
+        + xTd('幼儿情况（请假、生病、早接、状态、大便等）', { cs: 17, fs: 12, h: 37 })
+        + xTd('记录教师', { w: OBS_W[18], fs: 12, h: 37 }) + '</tr>'
+      // 数据行：高44pt，宋体12pt
+      days.forEach(d => {
+        const r = data[d] || {}
+        h += '<tr>' + xTd(month + '月' + d + '日', { w: OBS_W[0], fs: 12, h: 44, ta: 'left', nowrap: true })
+          + xTd(escapeHtml(r.note || ''), { cs: 17, fs: 12, h: 44 })
+          + xTd(escapeHtml(r.teacher || ''), { w: OBS_W[18], fs: 12, h: 44 }) + '</tr>'
+      })
+      // 表尾：高92pt，合并整行，无边框
+      h += '<tr>' + xTd(escapeHtml(data.__foot || ''), { cs: 19, fs: 12, h: 92, bd: false }) + '</tr>'
+      h += '</table>'
+      const blob = new Blob([xlsDoc(h)], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, '全日制观察记录表-' + cls.name + '-' + year + '年' + month + '月.xls')
+      alert('观察记录表已导出 ✅')
+    }
+
+    /* ================= 通风消毒记录表 ================= */
+    const DIS_KEY = 'jiayuan-disinfect'
+    const DIS_W = [64, 45, 52, 49, 50, 55, 60, 57, 45, 56, 51, 50, 51, 47, 51, 44, 41, 70, 78]
+    const DIS_HEAD = ['日期', '走廊', '活动室', '休息<br>室', '卫生间', '活动室地面', '卫生间地面', '洗手池', '便池', '水龙头',
+      '门窗', '桌椅', '玩具柜', '床架', '被褥', '水杯', '毛巾', '塑料玩具', '消毒人签字']
+    const DIS_NOTE = '说明： 一、填表方式：在已完成相应的通风、消毒栏内打 √  二、通风方法：每日通风不少于3次，每次不少于30分钟，时间：上午7:30-—8:00中午11:30——12:00 下午17:50—-18:20  三、消毒时间和方法：1.活动室地面、卫生间地面、洗手池、便池先用清水冲洗，然后用比例1:100的含氯消毒剂擦拭、作用30分钟后用清水洗净，早晨：7:00——7:30中午：11:10--11:40 下午：18:00—18:20,每天消毒三次。2.水龙头、门窗框、门把手用75%的酒精擦拭，桌椅、玩具柜、床架先用清水冲洗，然后用比例1:200的含氯消毒剂擦拭，作用30分钟后用清水洗净，每天消毒三次， 3.被褥室外阳光下暴晒一小时，每周一上午10:00-11:00暴晒一次。4.水杯洗净消毒柜消毒。每天18:10——18:20消毒一次。5.毛巾、塑料玩具消毒用洗涤剂浸泡、搓洗，清水清洗干净后，置阳光直接照射下晒干，每天上午11:30—12:30每天消毒一次。 每周五下午18:30——18:50  紫外线消毒。'
+
+    function openDisModal() {
+      document.getElementById('dis-modal').style.display = 'flex'
+      lockBodyScroll()
+      document.getElementById('dis-month').value = localMonthStr()
+      renderDis()
+    }
+    function closeDisModal() {
+      document.getElementById('dis-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function getDisData(cls, month) {
+      const all = JSON.parse(ls.getItem(DIS_KEY) || '{}')
+      return (all[cls.id] && all[cls.id][month]) || {}
+    }
+    function toggleDisSq(el) {
+      const on = el.textContent.trim() === '√'
+      el.textContent = on ? '' : '√'
+      el.classList.toggle('on', !on)
+    }
+    function saveDis(silent) {
+      const cls = getCurrentClass()
+      const month = document.getElementById('dis-month').value
+      if (!month) return alert('请选择月份')
+      const data = {}
+      document.querySelectorAll('[data-dis-day]').forEach(el => {
+        const d = el.dataset.disDay
+        const c = el.dataset.disCol
+        data[d] = data[d] || {}
+        data[d][c] = el.textContent.trim()
+      })
+      document.querySelectorAll('[data-dis-sign]').forEach(el => {
+        const d = el.dataset.disSign
+        data[d] = data[d] || {}
+        data[d].sign = el.value
+      })
+      const all = JSON.parse(ls.getItem(DIS_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(DIS_KEY, JSON.stringify(all))
+      if (!silent) alert('通风消毒记录表已保存 ✅')
+    }
+    function splitBlocks(days) {
+      const half = Math.ceil(days.length / 2)
+      return [days.slice(0, half), days.slice(half)].filter(b => b.length)
+    }
+    function renderDis() {
+      const container = document.getElementById('dis-table-container')
+      const bar = document.getElementById('dis-dates')
+      const noteEl = document.getElementById('dis-note')
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('dis-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        bar.innerHTML = ''
+        noteEl.textContent = ''
+        return
+      }
+      const [, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getDisData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table class="formtable">'
+      h += '<tr><td class="ft-title" colspan="19">临清市第四幼儿园（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班教室夏季各类设施通风、消毒记录表</td></tr>'
+      blocks.forEach(block => {
+        h += '<tr><th rowspan="2" style="min-width:60px">日期</th><th class="ft-group" colspan="4">通风</th><th class="ft-group" colspan="14">消毒</th></tr>'
+        h += '<tr>' + DIS_HEAD.slice(1).map(x => '<th style="min-width:38px">' + x + '</th>').join('') + '</tr>'
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr><td class="c-date">' + m + '月' + d + '日</td>'
+          for (let c = 1; c <= 17; c++) {
+            h += '<td class="cell-sq' + (r[c] === '√' ? ' on' : '') + '" data-dis-day="' + d + '" data-dis-col="' + c + '" onclick="toggleDisSq(this)">' + (r[c] || '') + '</td>'
+          }
+          h += '<td class="c-sign"><input type="text" data-dis-sign="' + d + '" value="' + escapeHtml(r.sign || '') + '" placeholder="签字"></td>'
+          h += '</tr>'
+        })
+      })
+      h += '</table>'
+      container.innerHTML = h
+      bar.innerHTML = renderDateBar('dis')
+      noteEl.textContent = DIS_NOTE
+    }
+    function exportDisExcel() {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('dis-month').value
+      if (!monthVal) return alert('请选择月份')
+      saveDis(true)
+      const [year, month] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getDisData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table style="border-collapse:collapse;">'
+      h += xlsColGroup(DIS_W)
+      // 标题：高39pt，宋体20pt，居中，无边框
+      h += '<tr>' + xTd('临清市第四幼儿园（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班教室夏季各类设施通风、消毒记录表', { cs: 19, fs: 20, h: 39, bd: false, nowrap: true }) + '</tr>'
+      // 分组行：高26pt，宋体12pt
+      h += '<tr>' + xTd('', { w: DIS_W[0], fs: 12, h: 26 })
+        + xTd('通风', { cs: 4, fs: 12, h: 26 })
+        + xTd('消毒', { cs: 14, fs: 12, h: 26 }) + '</tr>'
+      blocks.forEach(block => {
+        // 表头：高42pt，宋体12pt
+        h += '<tr>' + DIS_HEAD.map((x, i) => xTd(x, { w: DIS_W[i], fs: 12, h: 42 })).join('') + '</tr>'
+        // 数据行：高35pt，宋体12pt
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr>' + xTd(month + '月' + d + '日', { w: DIS_W[0], fs: 12, h: 35, ta: 'left', nowrap: true })
+          for (let c = 1; c <= 17; c++) h += xTd(r[c] || '', { w: DIS_W[c], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.sign || ''), { w: DIS_W[18], fs: 12, h: 35 }) + '</tr>'
+        })
+      })
+      // 说明行：高92pt，合并整行，无边框
+      h += '<tr>' + xTd(escapeHtml(DIS_NOTE), { cs: 19, fs: 12, h: 92, bd: false }) + '</tr>'
+      h += '</table>'
+      const blob = new Blob([xlsDoc(h)], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, '通风消毒记录表-' + cls.name + '-' + year + '年' + month + '月.xls')
+      alert('消毒记录表已导出 ✅')
+    }
+
+    /* ================= 交接班记录表 ================= */
+    const HAN_KEY = 'jiayuan-handover'
+    const HAN_W = [42, 58, 61, 56, 331, 114, 114, 114]
+    const HAN_FF_TITLE = '方正小标宋简体,SimSun,宋体,serif'
+    const HAN_FF_HEAD = '仿宋_GB2312,FangSong,仿宋,serif'
+
+    function openHanModal() {
+      document.getElementById('han-modal').style.display = 'flex'
+      lockBodyScroll()
+      document.getElementById('han-month').value = localMonthStr()
+      renderHan()
+    }
+    function closeHanModal() {
+      document.getElementById('han-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function getHanData(cls, month) {
+      const all = JSON.parse(ls.getItem(HAN_KEY) || '{}')
+      return (all[cls.id] && all[cls.id][month]) || {}
+    }
+    function saveHan(silent) {
+      const cls = getCurrentClass()
+      const month = document.getElementById('han-month').value
+      if (!month) return alert('请选择月份')
+      const data = {}
+      document.querySelectorAll('[data-han-day]').forEach(el => {
+        const d = el.dataset.hanDay
+        const f = el.dataset.hanF
+        data[d] = data[d] || {}
+        data[d][f] = el.value
+      })
+      const all = JSON.parse(ls.getItem(HAN_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(HAN_KEY, JSON.stringify(all))
+      if (!silent) alert('交接班记录表已保存 ✅')
+    }
+    function renderHan() {
+      const container = document.getElementById('han-table-container')
+      const bar = document.getElementById('han-dates')
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('han-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        bar.innerHTML = ''
+        return
+      }
+      const [y, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getHanData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table class="formtable" style="min-width:640px;">'
+      h += '<tr><td class="ft-title" colspan="8">&nbsp;&nbsp;第四幼儿园' + y + '年' + m + '月（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班交接班记录</td></tr>'
+      blocks.forEach(block => {
+        h += '<tr>'
+        h += '<th rowspan="2" style="min-width:54px">日期</th>'
+        h += '<th rowspan="2" style="min-width:52px">幼儿<br>应到</th>'
+        h += '<th rowspan="2" style="min-width:52px">幼儿<br>实到</th>'
+        h += '<th rowspan="2" style="min-width:52px">幼儿<br>缺勤</th>'
+        h += '<th rowspan="2" style="min-width:170px">幼儿在园情况</th>'
+        h += '<th class="ft-group" colspan="3">交接班时间下午14:30</th>'
+        h += '</tr>'
+        h += '<tr><th style="min-width:78px">交班教师</th><th style="min-width:78px">接班教师</th><th style="min-width:78px">接班教师</th></tr>'
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr>'
+          h += '<td class="c-date">' + d + '日</td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="should" value="' + escapeHtml(r.should || '') + '" placeholder="应到"></td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="actual" value="' + escapeHtml(r.actual || '') + '" placeholder="实到"></td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="absent" value="' + escapeHtml(r.absent || '') + '" placeholder="缺勤"></td>'
+          h += '<td class="c-txt"><input type="text" data-han-day="' + d + '" data-han-f="situation" value="' + escapeHtml(r.situation || '') + '" placeholder="幼儿在园情况"></td>'
+          h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t1" value="' + escapeHtml(r.t1 || '') + '" placeholder="交班"></td>'
+          h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t2" value="' + escapeHtml(r.t2 || '') + '" placeholder="接班"></td>'
+          h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t3" value="' + escapeHtml(r.t3 || '') + '" placeholder="接班"></td>'
+          h += '</tr>'
+        })
+      })
+      h += '</table>'
+      container.innerHTML = h
+      bar.innerHTML = renderDateBar('han')
+    }
+    function exportHanExcel() {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('han-month').value
+      if (!monthVal) return alert('请选择月份')
+      saveHan(true)
+      const [year, month] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getHanData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table style="border-collapse:collapse;">'
+      h += xlsColGroup(HAN_W)
+      // 标题：高42pt，方正小标宋简体12pt，居中，无边框
+      h += '<tr>' + xTd('&nbsp;&nbsp;第四幼儿园' + year + '年' + month + '月（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班交接班记录', { cs: 8, fs: 12, ff: HAN_FF_TITLE, h: 42, bd: false, nowrap: true }) + '</tr>'
+      blocks.forEach(block => {
+        // 表头第一行：高42pt，仿宋_GB2312 14pt
+        h += '<tr>'
+        h += xTd('日期', { w: HAN_W[0], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2, nowrap: true })
+        h += xTd('幼儿<br>应到', { w: HAN_W[1], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('幼儿<br>实到', { w: HAN_W[2], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('幼儿<br>缺勤', { w: HAN_W[3], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('幼儿在园情况', { w: HAN_W[4], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('交接班时间下午14:30', { cs: 3, fs: 14, ff: HAN_FF_HEAD, h: 42 })
+        h += '</tr>'
+        // 表头第二行：高39pt，仿宋_GB2312 14pt
+        h += '<tr>'
+        h += xTd('交班教师', { w: HAN_W[5], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += xTd('接班教师', { w: HAN_W[6], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += xTd('接班教师', { w: HAN_W[7], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += '</tr>'
+        // 数据行：高35pt，宋体12pt
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr>'
+          h += xTd(d + '日', { w: HAN_W[0], fs: 12, h: 35, nowrap: true })
+          h += xTd(escapeHtml(r.should || ''), { w: HAN_W[1], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.actual || ''), { w: HAN_W[2], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.absent || ''), { w: HAN_W[3], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.situation || ''), { w: HAN_W[4], fs: 12, h: 35, ta: 'left' })
+          h += xTd(escapeHtml(r.t1 || ''), { w: HAN_W[5], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.t2 || ''), { w: HAN_W[6], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.t3 || ''), { w: HAN_W[7], fs: 12, h: 35 })
+          h += '</tr>'
+        })
+      })
+      h += '</table>'
+      const blob = new Blob([xlsDoc(h)], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, '交接班记录-' + cls.name + '-' + year + '年' + month + '月.xls')
+      alert('交接班记录表已导出 ✅')
     }
 
     function genObservation() {
