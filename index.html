@@ -287,7 +287,7 @@
     body { padding-bottom: 0; }
 
     /* ===== 园所表格（观察表 / 消毒记录表 / 交接班表） ===== */
-    .formtable { border-collapse: collapse; font-size: 12px; background: #fff; }
+    .formtable { border-collapse: collapse; font-size: 12px; background: #fff; width: max-content; min-width: 100%; }
     .formtable th, .formtable td {
       border: 1px solid #E0C97F; padding: 2px 3px; text-align: center; vertical-align: middle;
     }
@@ -540,7 +540,7 @@
 
   <!-- 点名册弹窗 -->
   <div id="attendance-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
-    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;min-width:0;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">📋 点名册</h3>
         <button onclick="closeAttendanceModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
@@ -550,7 +550,7 @@
         <button onclick="exportAttendanceExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
         <button onclick="saveAttendanceData()" style="width:auto;">保存体温</button>
       </div>
-      <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成点名册</p>
       </div>
     </div>
@@ -558,7 +558,7 @@
 
   <!-- 全日制观察记录表弹窗 -->
   <div id="obs-form-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
-    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;min-width:0;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">👀 全日制观察记录表</h3>
         <button onclick="closeObsFormModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
@@ -569,7 +569,7 @@
         <button onclick="saveObsForm()" style="width:auto;">保存</button>
       </div>
       <div id="obs-form-dates"></div>
-      <div id="obs-form-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <div id="obs-form-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成观察表</p>
       </div>
     </div>
@@ -577,7 +577,7 @@
 
   <!-- 通风消毒记录表弹窗 -->
   <div id="dis-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
-    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:1100px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:1100px;min-width:0;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">🧴 通风消毒记录表</h3>
         <button onclick="closeDisModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
@@ -588,7 +588,7 @@
         <button onclick="saveDis()" style="width:auto;">保存</button>
       </div>
       <div id="dis-dates"></div>
-      <div id="dis-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <div id="dis-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成消毒记录表</p>
       </div>
       <p id="dis-note" style="font-size:11px;color:var(--muted);line-height:1.6;margin:10px 0 0;"></p>
@@ -597,7 +597,7 @@
 
   <!-- 交接班记录表弹窗 -->
   <div id="han-modal" style="display:none;position:fixed;inset:0;background:rgba(93,64,55,.5);z-index:200;padding:12px;align-items:center;justify-content:center;overflow-y:auto;">
-    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
+    <div style="background:var(--card);border-radius:16px;padding:16px;max-width:960px;min-width:0;width:100%;max-height:95vh;overflow-y:auto;box-shadow:0 12px 40px rgba(93,64,55,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">🔁 交接班记录表</h3>
         <button onclick="closeHanModal()" style="width:auto;padding:6px 12px;background:#FFEBEE;color:#C62828;">关闭</button>
@@ -608,7 +608,7 @@
         <button onclick="saveHan()" style="width:auto;">保存</button>
       </div>
       <div id="han-dates"></div>
-      <div id="han-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <div id="han-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成交接班表</p>
       </div>
     </div>
