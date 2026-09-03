@@ -1748,11 +1748,11 @@
       return days
     }
 
-    // 体温下拉选项：可选项（35.5~39.9 每 0.1 度）+ △（没来）
+    // 体温下拉选项：可选项（36.0~38.0 每 0.1 度）+ △（没来）
     function attendanceTempOptions(val) {
       const norm = (val == null ? '' : String(val)).trim()
       let h = `<option value="" ${norm === '' ? 'selected' : ''}>℃</option>`
-      for (let i = 355; i <= 399; i++) {
+      for (let i = 360; i <= 380; i++) {
         const tv = (i / 10).toFixed(1)
         h += `<option value="${tv}" ${norm === tv ? 'selected' : ''}>${tv}</option>`
       }

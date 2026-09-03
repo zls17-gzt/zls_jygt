@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v46**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v47**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,12 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v47 · 体温选项收窄为 36.0~38.0）
+
+- 体温下拉档位由 `35.5~39.9`（45 档）收窄为 `36.0~38.0`（每 0.1 度，共 21 档），减少滚动长度；`△（没来）` 与空值 `℃` 占位保留。
+- 导出 Excel 版式不变，仍 1:1 还原原 xls。
+- `sw.js` 升级到 v47。
 
 ## 本次改动（v46 · 点名册体温改为下拉选择）
 
