@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v43**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v44**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -19,6 +19,13 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - **Pages**：已通过 GitHub API 开启，`source = main / (root)`，构建完成返回 200。
 - **永久网址**：https://zls17-gzt.github.io/zls_jygt/ （实测可访问，title=家园沟通站）
 - **后续更新**：修改代码后，把 `sw.js` 的 `CACHE_NAME` 升一版（如 v13），再 `git push` 即可；手机端关掉重开生效。
+
+## 本次改动（v44 · 表格弹窗底部留白，避免被浏览器导航栏遮挡）
+
+- 三张园所表格弹窗（观察表 / 通风消毒记录表 / 交接班表）底部增加 `80px + env(safe-area-inset-bottom)` 留白。
+- 弹窗内容区改为顶部对齐（`align-items:flex-start`），长表格可从顶部自然向下滚动。
+- 解决华为浏览器等机型中，弹窗最下方的「说明」文字被底部浏览器导航栏盖住的问题。
+- `sw.js` 升级到 v44。
 
 ## 本次改动（v20 · 左侧边栏改回底部 Tab 栏）
 
@@ -46,7 +53,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（底部 Tab 栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v43） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v44） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |
