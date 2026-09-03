@@ -1,0 +1,1955 @@
+
+    /* ============ B0：localStorage 兼容层（处理 iOS 无痕模式等异常） ============ */
+    const ls = {
+      _ok: null,
+      _check() {
+        if (this._ok !== null) return this._ok
+        try {
+          const testKey = '_test_' + Date.now()
+          localStorage.setItem(testKey, '1')
+          localStorage.removeItem(testKey)
+          this._ok = true
+        } catch (e) {
+          this._ok = false
+          console.warn('localStorage 不可用（可能是 iOS 无痕模式）：', e.message)
+        }
+        return this._ok
+      },
+      getItem(key) {
+        if (!this._check()) return null
+        try { return localStorage.getItem(key) } catch (e) { return null }
+      },
+      setItem(key, val) {
+        if (!this._check()) return false
+        try { localStorage.setItem(key, val); return true } catch (e) { return false }
+      },
+      removeItem(key) {
+        if (!this._check()) return false
+        try { localStorage.removeItem(key); return true } catch (e) { return false }
+      }
+    }
+
+    /* ============ B0-2：iOS 兼容辅助函数 ============ */
+    // 检测是否为 iOS 设备
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+    // 弹窗打开时锁定 body 滚动（防止 iOS 滚动穿透）
+    let _scrollTop = 0
+    function lockBodyScroll() {
+      _scrollTop = window.scrollY || document.documentElement.scrollTop
+      document.body.style.position = 'fixed'
+      document.body.style.top = '-' + _scrollTop + 'px'
+      document.body.style.width = '100%'
+      document.body.style.overflow = 'hidden'
+    }
+    function unlockBodyScroll() {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflow = ''
+      window.scrollTo(0, _scrollTop)
+    }
+    // 文件下载兼容（iOS/微信/华为浏览器等不支持 a.download）
+    async function downloadBlob(blob, filename) {
+      // 1) 首选 Web Share API
+      if (navigator.canShare) {
+        try {
+          const file = new File([blob], filename, { type: blob.type })
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: filename })
+            return
+          }
+        } catch (e) {
+          // 用户取消或分享失败，继续尝试
+        }
+      }
+
+      // 2) 尝试 location.href 直接下载（某些安卓浏览器支持）
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.target = '_blank'
+      document.body.appendChild(a)
+      const result = a.click()
+      document.body.removeChild(a)
+
+      // 给一个短暂的延迟，如果浏览器支持 a.download，应该已经开始下载了
+      await new Promise(r => setTimeout(r, 800))
+
+      // 3) 兜底：显示弹窗让用户手动复制
+      showDownloadFallbackModal(blob, filename)
+      URL.revokeObjectURL(url)
+    }
+
+    // 下载兜底弹窗
+    function showDownloadFallbackModal(blob, filename) {
+      const modal = document.getElementById('download-fallback-modal')
+      const titleEl = document.getElementById('download-fallback-filename')
+      const contentEl = document.getElementById('download-fallback-content')
+      titleEl.textContent = filename
+      modal.style.display = 'flex'
+      lockBodyScroll()
+
+      const reader = new FileReader()
+      reader.onload = function () {
+        contentEl.textContent = reader.result
+      }
+      reader.readAsText(blob)
+    }
+    function closeDownloadFallbackModal() {
+      document.getElementById('download-fallback-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function copyDownloadFallbackContent() {
+      const contentEl = document.getElementById('download-fallback-content')
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(contentEl)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      try {
+        document.execCommand('copy')
+        alert('内容已复制到剪贴板 ✅\n请粘贴到备忘录或微信文件传输助手保存')
+      } catch (e) {
+        alert('复制失败，请手动长按内容 → 全选 → 复制')
+      }
+    }
+
+    /* ============ B1-3：注册 Service Worker（仅 http(s) 下生效） ============ */
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+          // 已经有一个新版本在等待激活 → 直接提示
+          if (reg.waiting) showUpdateBanner(reg.waiting)
+          reg.addEventListener('updatefound', () => {
+            const installing = reg.installing
+            if (!installing) return
+            installing.addEventListener('statechange', () => {
+              // 新 SW 已安装好，且当前页面已被旧 SW 控制 → 提示用户更新
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(reg.waiting || installing)
+              }
+            })
+          })
+        })
+        // 新 SW 接管后自动刷新页面以加载新内容
+        let reloading = false
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloading) return
+          reloading = true
+          location.reload()
+        })
+      })
+    }
+    function showUpdateBanner(waiting) {
+      const b = document.getElementById('update-banner')
+      if (!b || b.dataset.shown) return
+      b.dataset.shown = '1'
+      b.style.display = 'flex'
+      b.querySelector('button').onclick = () => {
+        if (waiting) waiting.postMessage('SKIP_WAITING')
+        else location.reload()
+      }
+    }
+
+    /* ============ B2 数据层：localStorage 存取 ============ */
+    const STORE_KEY = 'jiayuan-data'
+    const REPORT_HISTORY_KEY = 'jiayuan-report-history'
+    const DAY_NOTES_KEY = 'jiayuan-daynotes'
+    function load() {
+      try {
+        let db = JSON.parse(ls.getItem(STORE_KEY))
+        if (!db || !Array.isArray(db.classes)) {
+          const oldChildren = (db && db.children) || []
+          const oldRecords = (db && db.records) || []
+          oldChildren.forEach(c => {
+            if (c.parentPhone && !c.parentPhones) c.parentPhones = [c.parentPhone]
+            if (!c.parentPhones) c.parentPhones = []
+          })
+          oldRecords.forEach(r => {
+            if (r.childId && !r.childIds) {
+              r.childIds = [r.childId]
+              r.childNames = [r.childName || '']
+              delete r.childId
+              delete r.childName
+            }
+          })
+          db = {
+            classes: [{ id: 'class-' + Date.now(), name: '默认班级', children: oldChildren, records: oldRecords }],
+            currentClassId: null,
+            holidays: []
+          }
+        }
+        db.classes.forEach(cls => {
+          (cls.children || []).forEach(c => {
+            if (c.parentPhone && !c.parentPhones) c.parentPhones = [c.parentPhone]
+            if (!c.parentPhones) c.parentPhones = []
+          })
+        })
+        if (!db.currentClassId || !db.classes.find(c => c.id === db.currentClassId)) {
+          db.currentClassId = db.classes[0].id
+        }
+        return db
+      }
+      catch (e) { return { classes: [{ id: 'class-' + Date.now(), name: '默认班级', children: [], records: [] }], currentClassId: null, holidays: [] } }
+    }
+    function save(db) { ls.setItem(STORE_KEY, JSON.stringify(db)) }
+    function getCurrentClass() {
+      const db = load()
+      return db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
+    }
+    function setCurrentClass(id) {
+      const db = load()
+      if (db.classes.find(c => c.id === id)) {
+        db.currentClassId = id
+        save(db)
+        renderAll()
+      }
+    }
+    function addClass(name) {
+      const db = load()
+      const n = name.trim()
+      if (!n) return alert('请输入班级名称')
+      if (db.classes.find(c => c.name === n)) return alert('该班级已存在')
+      db.classes.push({ id: 'class-' + Date.now(), name: n, children: [], records: [] })
+      save(db)
+      document.getElementById('new-class-name').value = ''
+      renderAll()
+    }
+    function renameClass(id, name) {
+      const db = load()
+      const cls = db.classes.find(c => c.id === id)
+      if (!cls) return
+      const n = name.trim()
+      if (!n) return alert('班级名称不能为空')
+      cls.name = n
+      save(db)
+      renderAll()
+    }
+    function deleteClass(id) {
+      const db = load()
+      if (db.classes.length <= 1) return alert('至少保留一个班级')
+      if (!confirm('确定删除该班级？班级里的孩子与记录会一起删除，不可恢复。')) return
+      db.classes = db.classes.filter(c => c.id !== id)
+      if (db.currentClassId === id) db.currentClassId = db.classes[0].id
+      save(db)
+      renderAll()
+    }
+
+    /* ============ 首页 ============ */
+    const TIPS = [
+      '给重要的家长发一条孩子进步的反馈吧，就现在。',
+      '今天哪个孩子让你印象最深刻？记下来吧。',
+      '孩子的成长藏在细节里，别忘了拍照留念。',
+      '每周一篇周报，让家长看见孩子的变化。',
+      '表扬要具体，比如"你今天主动分享了玩具"。'
+    ]
+    function updateHeroTime() {
+      const now = new Date()
+      const hours = now.getHours()
+      const greet = hours < 6 ? '夜深了' : hours < 9 ? '早上好' : hours < 12 ? '上午好' : hours < 14 ? '中午好' : hours < 18 ? '下午好' : '晚上好'
+      document.getElementById('greeting').textContent = greet + '，赵老师'
+      document.getElementById('hero-time').textContent = String(hours).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')
+      document.getElementById('hero-date').textContent = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 · ' + ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]
+      document.getElementById('header-date').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]
+    }
+    function updateHomeStats() {
+      const cls = getCurrentClass()
+      const today = new Date().toISOString().slice(0, 10)
+      const todayRecords = (cls.records || []).filter(r => r.date === today).length
+      document.getElementById('stat-records').textContent = todayRecords
+      document.getElementById('stat-kids').textContent = (cls.children || []).length
+      const all = getAllHolidays()
+      const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(a.date))
+      if (future.length) {
+        const h = future[0]
+        const d = daysUntil(h.date)
+        document.getElementById('stat-holiday').textContent = (d === 0 ? '今天' : d + '天')
+        document.getElementById('stat-holiday-label').textContent = h.name
+      } else {
+        document.getElementById('stat-holiday').textContent = '--'
+        document.getElementById('stat-holiday-label').textContent = '最近节日'
+      }
+      const idx = today.split('-').reduce((a, c) => a + parseInt(c), 0) % TIPS.length
+      document.getElementById('daily-tip').textContent = TIPS[idx]
+    }
+
+    /* ============ 月历 ============ */
+    let calendarDate = new Date()
+    function changeMonth(delta) {
+      calendarDate.setMonth(calendarDate.getMonth() + delta)
+      renderCalendar()
+    }
+    function renderCalendar() {
+      const el = document.getElementById('calendar-days')
+      const ymEl = document.getElementById('calendar-ym')
+      if (!el || !ymEl) return
+      const y = calendarDate.getFullYear()
+      const m = calendarDate.getMonth()
+      ymEl.textContent = y + '年' + (m + 1) + '月'
+      const firstDay = new Date(y, m, 1)
+      const startDay = firstDay.getDay() // 0=周日
+      const daysInMonth = new Date(y, m + 1, 0).getDate()
+      const cls = getCurrentClass()
+      const records = cls.records || []
+      const holidays = getAllHolidays()
+      const dayNotes = loadDayNotes()
+      const today = new Date().toISOString().slice(0, 10)
+      let html = ''
+      // 上月补位
+      const prevMonthLastDay = new Date(y, m, 0).getDate()
+      for (let i = startDay - 1; i >= 0; i--) {
+        html += `<div class="calendar-day other">${prevMonthLastDay - i}</div>`
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+        const isToday = dateStr === today
+        const hasRecord = records.some(r => r.date === dateStr)
+        const holiday = holidays.find(h => h.date === dateStr)
+        const isWeekend = new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6
+        const noteText = dayNotes[dateStr] || ''
+        const hasNote = !!noteText
+        let marks = ''
+        if (hasRecord) marks += '<i class="dot record"></i>'
+        if (holiday) marks += '<i class="dot holiday"></i>'
+        html += `
+          <div class="calendar-day ${isToday ? 'today' : ''} ${hasNote ? 'has-note' : ''}" onclick="openDayModal('${dateStr}')" ondblclick="openDayModal('${dateStr}', true)" title="${holiday ? holiday.name : ''}">
+            <span class="daynum" style="${isWeekend && !isToday && !hasNote ? 'color:#FF8F80' : ''}">${d}</span>
+            ${hasNote ? '<div class="note-text">' + escapeHtml(noteText) + '</div>' : ''}
+            ${marks ? '<div class="marks ' + (hasNote ? 'inline' : '') + '">' + marks + '</div>' : ''}
+          </div>
+        `
+      }
+      // 下月补位
+      const totalCells = startDay + daysInMonth
+      const nextPad = (7 - (totalCells % 7)) % 7
+      for (let i = 1; i <= nextPad; i++) {
+        html += `<div class="calendar-day other">${i}</div>`
+      }
+      el.innerHTML = html
+    }
+    /* ============ 月历每日笔记 ============ */
+    let currentDayNoteDate = ''
+    function loadDayNotes() {
+      try { return JSON.parse(ls.getItem(DAY_NOTES_KEY)) || {} }
+      catch (e) { return {} }
+    }
+    function openDayModal(dateStr, focusNote) {
+      currentDayNoteDate = dateStr
+      document.getElementById('day-modal-title').textContent = dateStr + ' ' + formatWeekday(dateStr)
+      const cls = getCurrentClass()
+      const records = (cls.records || []).filter(r => r.date === dateStr)
+      const recEl = document.getElementById('day-modal-records')
+      if (records.length === 0) {
+        recEl.innerHTML = '<div class="modal-empty">这一天还没有成长记录</div>'
+      } else {
+        recEl.innerHTML = records.map(r =>
+          `<div class="modal-rec-item"><b>${(r.childNames || ['未知']).join('、')}</b> · ${r.area}<br>${escapeHtml(r.text)}</div>`
+        ).join('')
+      }
+      document.getElementById('day-modal-note').value = loadDayNotes()[dateStr] || ''
+      document.getElementById('day-modal').style.display = 'flex'
+      lockBodyScroll()
+      if (focusNote) setTimeout(() => document.getElementById('day-modal-note').focus(), 50)
+    }
+    function saveDayNote() {
+      const notes = loadDayNotes()
+      const val = document.getElementById('day-modal-note').value.trim()
+      if (val) notes[currentDayNoteDate] = val
+      else delete notes[currentDayNoteDate]
+      ls.setItem(DAY_NOTES_KEY, JSON.stringify(notes))
+      closeDayModal()
+      renderCalendar()
+      alert('已保存 ✅')
+    }
+    function closeDayModal() {
+      document.getElementById('day-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+
+    /* ============ 孩子 ============ */
+    function addChild() {
+      const name = document.getElementById('k-name').value.trim()
+      if (!name) return alert('请输入姓名')
+      const phoneRaw = document.getElementById('k-parent-phone').value.trim()
+      const phones = phoneRaw ? parsePhones(phoneRaw) : []
+      if (phones === null) return alert('家长手机号应为 11 位数字（多个用空格或逗号分隔）')
+      const db = load()
+      const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
+      cls.children.push({
+        id: Date.now().toString(),
+        name,
+        gender: document.getElementById('k-gender').value,
+        birthday: document.getElementById('k-birthday').value,
+        idCard: document.getElementById('k-idcard').value.trim(),
+        parentName: document.getElementById('k-parent-name').value.trim(),
+        parentPhones: phones,
+        note: document.getElementById('k-note').value.trim(),
+        createdAt: new Date().toISOString()
+      })
+      save(db)
+      document.getElementById('k-name').value = ''
+      document.getElementById('k-gender').value = ''
+      document.getElementById('k-birthday').value = ''
+      document.getElementById('k-idcard').value = ''
+      document.getElementById('k-parent-name').value = ''
+      document.getElementById('k-parent-phone').value = ''
+      document.getElementById('k-note').value = ''
+      renderAll()
+    }
+
+    /* ============ 图片压缩与预览 ============ */
+    let pendingImages = []
+    let editingRecordId = null
+    function renderImagePreview() {
+      const preview = document.getElementById('r-img-preview')
+      preview.innerHTML = pendingImages.map((img, idx) => `
+        <div style="position:relative;width:72px;height:72px;">
+          <img src="${img}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--border);">
+          <span onclick="removePendingImage(${idx})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;background:#FF5252;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">×</span>
+        </div>
+      `).join('') + '<label class="img-upload-btn" for="r-img">+</label>'
+      preview.lastElementChild.style.display = pendingImages.length >= 3 ? 'none' : 'flex'
+    }
+    function removePendingImage(idx) {
+      pendingImages.splice(idx, 1)
+      renderImagePreview()
+    }
+    function compressImage(file, maxWidth, quality) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => {
+          const img = new Image()
+          img.onload = () => {
+            const canvas = document.createElement('canvas')
+            const scale = Math.min(1, maxWidth / img.width)
+            canvas.width = img.width * scale
+            canvas.height = img.height * scale
+            const ctx = canvas.getContext('2d')
+            ctx.fillStyle = '#fff'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+            resolve(canvas.toDataURL('image/jpeg', quality))
+          }
+          img.onerror = reject
+          img.src = e.target.result
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+    function previewImages(input) {
+      const remain = Math.max(0, 3 - pendingImages.length)
+      const files = Array.from(input.files || []).slice(0, remain)
+      if (!files.length) return alert('最多3张图片')
+      Promise.all(files.map(file => compressImage(file, 1024, 0.8)))
+        .then(dataUrls => {
+          pendingImages.push(...dataUrls)
+          renderImagePreview()
+          input.value = ''
+        })
+        .catch(() => alert('图片处理失败，请重试'))
+    }
+
+    /* ============ 记录 ============ */
+    function saveRecord() {
+      const checked = [...document.querySelectorAll('input[name="r-child"]:checked')]
+      if (checked.length === 0) return alert('请至少选择一名幼儿')
+      const db = load()
+      const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
+      const payload = {
+        childIds: checked.map(cb => cb.value),
+        childNames: checked.map(cb => cb.dataset.name),
+        area: document.getElementById('r-area').value,
+        text: document.getElementById('r-text').value.trim(),
+        images: pendingImages.slice()
+      }
+      const isEdit = !!editingRecordId
+      if (isEdit) {
+        const idx = cls.records.findIndex(r => r.id === editingRecordId)
+        if (idx !== -1) cls.records[idx] = { ...cls.records[idx], ...payload }
+      } else {
+        cls.records.push({ id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), ...payload })
+      }
+      save(db)
+      cancelEdit()
+      renderAll()
+      alert(isEdit ? '已更新 ✅' : '已保存 ✅')
+    }
+    function editRecord(id) {
+      const cls = getCurrentClass()
+      const r = cls.records.find(x => x.id === id)
+      if (!r) return
+      editingRecordId = id
+      document.querySelectorAll('input[name="r-child"]').forEach(cb => {
+        cb.checked = (r.childIds || []).includes(cb.value)
+      })
+      document.getElementById('r-area').value = r.area || '建构区'
+      document.getElementById('r-text').value = r.text || ''
+      pendingImages = (r.images || []).slice()
+      renderImagePreview()
+      document.getElementById('r-edit-actions').style.display = 'block'
+      document.getElementById('r-save-btn').textContent = '更新记录'
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    function cancelEdit() {
+      editingRecordId = null
+      document.getElementById('r-text').value = ''
+      document.querySelectorAll('input[name="r-child"]').forEach(cb => cb.checked = false)
+      pendingImages = []
+      renderImagePreview()
+      document.getElementById('r-edit-actions').style.display = 'none'
+      document.getElementById('r-save-btn').textContent = '保存记录'
+    }
+    function deleteRecord() {
+      if (!editingRecordId) return
+      if (!confirm('确定删除这条记录吗？')) return
+      const db = load()
+      const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
+      cls.records = cls.records.filter(r => r.id !== editingRecordId)
+      save(db)
+      cancelEdit()
+      renderAll()
+      alert('已删除 ✅')
+    }
+
+    /* ============ 渲染 ============ */
+    function renderAll() {
+      const db = load()
+      const cls = getCurrentClass()
+      const children = cls.children || []
+      const records = cls.records || []
+      updateHeroTime()
+      updateHomeStats()
+      renderCalendar()
+      // 顶部班级选择器
+      document.querySelectorAll('.class-bar').forEach(bar => {
+        bar.innerHTML = `
+          <span style="font-size:13px;color:var(--muted)">当前班级</span>
+          <select onchange="setCurrentClass(this.value)" style="margin:0;flex:1;min-width:120px;">
+            ${db.classes.map(c => `<option value="${c.id}" ${c.id === db.currentClassId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+        `
+      })
+      // 幼儿多选
+      const rChildList = document.getElementById('r-child-list')
+      if (children.length === 0) {
+        rChildList.innerHTML = '<div style="color:var(--muted);font-size:13px">（当前班级还没有孩子）</div>'
+      } else {
+        rChildList.innerHTML = children.map(c => `
+          <label class="child-check">
+            <input type="checkbox" name="r-child" value="${c.id}" data-name="${c.name}">
+            <span>${c.name}</span>
+          </label>
+        `).join('')
+      }
+      // 周报下拉
+      const opts = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+      document.getElementById('w-child').innerHTML = opts || '<option value="">（当前班级还没有孩子）</option>'
+      // 观察记录下拉
+      document.getElementById('obs-child').innerHTML = opts || '<option value="">（当前班级还没有孩子）</option>'
+      // 今日记录
+      const today = new Date().toISOString().slice(0, 10)
+      document.getElementById('record-list').innerHTML = records
+        .filter(r => r.date === today)
+        .map(r => `<div class="card record-card"><b>${(r.childNames || ['未知']).join('、')}</b> · ${r.area}<br>${r.text}
+               ${(r.images || []).map(img => `<img src="${img}" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;">`).join('')}
+               <div style="display:flex;gap:8px;margin-top:10px;">
+                 <button onclick="editRecord('${r.id}')" style="flex:1;width:auto;background:#FFE082;">✏️ 编辑</button>
+               </div>
+               <div style="color:var(--muted);font-size:12px;margin-top:6px">${r.date}</div></div>`)
+        .reverse().join('') || '<div class="card">今天还没有记录</div>'
+      // 孩子列表
+      document.getElementById('kid-list').innerHTML = children
+        .map(c => `<div class="card kid-card" onclick="toggleKidDetail('${c.id}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b>${c.name}</b>
+            <span style="font-size:12px;color:var(--muted)">${(c.parentPhones || []).join(' / ')}</span>
+          </div>
+          <div id="kid-detail-${c.id}" style="display:none;margin-top:8px;font-size:13px;color:var(--text);line-height:1.6;">
+            ${c.gender ? '性别：' + escapeHtml(c.gender) + '<br>' : ''}
+            ${c.birthday ? '生日：' + escapeHtml(c.birthday) + '<br>' : ''}
+            ${c.idCard ? '身份证：' + escapeHtml(c.idCard) + '<br>' : ''}
+            ${c.parentName ? '家长姓名：' + escapeHtml(c.parentName) + '<br>' : ''}
+            ${((c.parentPhones || []).length) ? '家长手机号：' + c.parentPhones.map(p => `<a href="tel:${escapeHtml(p)}" style="color:var(--primary-dark)">${escapeHtml(p)}</a>`).join('、') + '<br>' : ''}
+            ${c.note ? '备注：' + escapeHtml(c.note) : ''}
+          </div>
+        </div>`).join('') || ''
+      renderClassSettings()
+      renderHolidays()
+      renderReportHistory()
+      renderObservationHistory()
+    }
+    function toggleKidDetail(id) {
+      const el = document.getElementById('kid-detail-' + id)
+      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'
+    }
+
+    /* ============ 班级管理 ============ */
+    function renderClassSettings() {
+      const db = load()
+      const list = document.getElementById('class-list')
+      if (!list) return
+      list.innerHTML = db.classes.map(c => `
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <input value="${escapeHtml(c.name)}" onchange="renameClass('${c.id}', this.value)" style="flex:1;margin:0;">
+          ${c.id === db.currentClassId ? '<span style="font-size:12px;color:var(--primary-dark)">当前</span>' : '<span style="font-size:12px;color:var(--muted)">切换</span>'}
+          <button onclick="deleteClass('${c.id}')" class="danger" style="width:auto;flex:0;padding:8px 12px;">删除</button>
+        </div>
+      `).join('')
+    }
+
+    /* ============ 节假日管理 ============ */
+    const BUILTIN_HOLIDAYS = {
+      '元旦': '2026-01-01',
+      '春节': '2026-02-17',
+      '清明节': '2026-04-05',
+      '劳动节': '2026-05-01',
+      '端午节': '2026-06-19',
+      '中秋节': '2026-09-25',
+      '国庆节': '2026-10-01'
+    }
+    function getAllHolidays() {
+      const db = load()
+      const customs = db.holidays || []
+      const list = Object.entries(BUILTIN_HOLIDAYS).map(([name, date]) => ({ name, date, builtin: true }))
+      customs.forEach(h => { list.push({ name: h.name, date: h.date, builtin: false }) })
+      return list
+    }
+    function daysUntil(dateStr) {
+      const target = new Date(dateStr + 'T00:00:00')
+      const now = new Date()
+      now.setHours(0, 0, 0, 0)
+      return Math.ceil((target - now) / 86400000)
+    }
+    function formatWeekday(dateStr) {
+      return ['周日','周一','周二','周三','周四','周五','周六'][new Date(dateStr + 'T00:00:00').getDay()]
+    }
+    function renderHolidays() {
+      const listEl = document.getElementById('holiday-list')
+      const customEl = document.getElementById('custom-holiday-list')
+      if (!listEl && !customEl) return
+      if (listEl) {
+        const all = getAllHolidays()
+        const future = all.filter(h => daysUntil(h.date) >= 0).sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
+        const past = all.filter(h => daysUntil(h.date) < 0).sort((a, b) => daysUntil(b.date) - daysUntil(a.date))
+        listEl.innerHTML = '<div class="holiday-grid">' + future.concat(past).map(h => {
+          const d = daysUntil(h.date)
+          const date = new Date(h.date + 'T00:00:00')
+          const isPast = d < 0
+          const isToday = d === 0
+          const tagClass = h.builtin ? '' : 'custom'
+          const tagText = h.builtin ? '内置' : '自定义'
+          return `
+            <div class="holiday-card ${isPast ? 'past' : ''} ${isToday ? 'today' : ''}">
+              <div class="holiday-date">
+                <span class="holiday-month">${date.getMonth() + 1}月</span>
+                <span class="holiday-day">${date.getDate()}</span>
+                <span class="holiday-week">${formatWeekday(h.date)}</span>
+              </div>
+              <div class="holiday-name ${isPast ? 'past-name' : ''}">
+                ${escapeHtml(h.name)}
+                <span class="holiday-tag ${tagClass}">${tagText}</span>
+              </div>
+              <div class="holiday-count">
+                ${isToday ? '🎉 今天' : (isPast ? '已过 ' + Math.abs(d) + ' 天' : '还有 ' + d + ' 天')}
+              </div>
+            </div>
+          `
+        }).join('') + '</div>'
+      }
+      if (customEl) {
+        const customs = (load().holidays || [])
+        customEl.innerHTML = customs.map((h, idx) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF3E0;">
+            <span style="font-size:14px;">${escapeHtml(h.name)} · ${h.date}</span>
+            <button onclick="deleteHoliday(${idx})" class="danger" style="width:auto;flex:0;padding:6px 10px;">删除</button>
+          </div>
+        `).join('') || '<div style="font-size:13px;color:var(--muted)">还没有自定义节假日</div>'
+      }
+    }
+    function addHoliday() {
+      const name = document.getElementById('h-name').value.trim()
+      const date = document.getElementById('h-date').value
+      if (!name || !date) return alert('请输入节假日名称和日期')
+      const db = load()
+      db.holidays = db.holidays || []
+      db.holidays.push({ name, date })
+      save(db)
+      document.getElementById('h-name').value = ''
+      document.getElementById('h-date').value = ''
+      renderHolidays()
+      updateHomeStats()
+      alert('已添加 ✅')
+    }
+    function deleteHoliday(idx) {
+      const db = load()
+      db.holidays = db.holidays || []
+      db.holidays.splice(idx, 1)
+      save(db)
+      renderHolidays()
+      updateHomeStats()
+    }
+
+    /* ============ CSV 导入 ============ */
+    function downloadChildTemplate() {
+      const header = '姓名,性别,生日,身份证号,家长姓名,家长手机号,备注\n'
+      const sample = '张三,男,2019-05-12,310XXXXXXXXXXXXX,张爸爸,13800138000 13900139000,活泼好动\n'
+      const blob = new Blob(['\uFEFF' + header + sample], { type: 'text/csv;charset=utf-8;' })
+      downloadBlob(blob, '孩子信息导入模板.csv')
+    }
+    function importChildren(input) {
+      const file = input.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = e => {
+        const lines = String(e.target.result).split(/\r?\n/).filter(l => l.trim())
+        if (lines.length < 2) return alert('文件内容为空或缺少表头')
+        const header = parseCsvLine(lines[0]).map(h => h.trim())
+        const nameIdx = header.indexOf('姓名')
+        if (nameIdx === -1) return alert('模板缺少「姓名」列，请使用下载的模板')
+        const idx = key => header.indexOf(key)
+        let success = 0, fail = []
+        const db = load()
+        const cls = db.classes.find(c => c.id === db.currentClassId) || db.classes[0]
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i])
+          const name = (cols[nameIdx] || '').trim()
+          if (!name) { fail.push('第' + (i + 1) + '行：姓名不能为空'); continue }
+          const phones = parsePhones(cols[idx('家长手机号')] || '')
+          if (phones === null) { fail.push('第' + (i + 1) + '行：手机号格式不正确'); continue }
+          cls.children.push({
+            id: Date.now().toString() + '-' + i,
+            name,
+            gender: (cols[idx('性别')] || '').trim(),
+            birthday: (cols[idx('生日')] || '').trim(),
+            idCard: (cols[idx('身份证号')] || '').trim(),
+            parentName: (cols[idx('家长姓名')] || '').trim(),
+            parentPhones: phones,
+            note: (cols[idx('备注')] || '').trim(),
+            createdAt: new Date().toISOString()
+          })
+          success++
+        }
+        save(db)
+        renderAll()
+        input.value = ''
+        let msg = '成功导入 ' + success + ' 个孩子'
+        if (fail.length) msg += '，' + fail.length + ' 行失败：\n' + fail.slice(0, 5).join('\n')
+        alert(msg)
+      }
+      reader.readAsText(file)
+    }
+    function parseCsvLine(line) {
+      const cols = []
+      let cur = '', inQuotes = false
+      for (const ch of line) {
+        if (ch === '"') inQuotes = !inQuotes
+        else if (ch === ',' && !inQuotes) { cols.push(cur); cur = '' }
+        else cur += ch
+      }
+      cols.push(cur)
+      return cols
+    }
+    function parsePhones(raw) {
+      const list = String(raw).split(/[，,；;\s]+/).map(s => s.trim()).filter(Boolean)
+      if (list.length === 0) return []
+      for (const p of list) if (!/^\d{11}$/.test(p)) return null
+      return list
+    }
+
+    /* ============ 周报生成 ============ */
+    let currentReportImages = []
+    let currentReportChildId = ''
+    let currentReportChildName = ''
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
+    }
+    function renderReport(text, images) {
+      const imageHtml = (images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('w-out').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+    }
+    // 保存周报到历史
+    function saveReportHistory(text, images, isPolished) {
+      const list = JSON.parse(ls.getItem(REPORT_HISTORY_KEY) || '[]')
+      list.unshift({
+        id: Date.now().toString(),
+        childId: currentReportChildId,
+        childName: currentReportChildName,
+        text,
+        images: images || [],
+        isPolished: !!isPolished,
+        createdAt: new Date().toISOString()
+      })
+      // 最多保留 50 条
+      if (list.length > 50) list.length = 50
+      ls.setItem(REPORT_HISTORY_KEY, JSON.stringify(list))
+      renderReportHistory()
+    }
+    // 渲染周报历史列表
+    function renderReportHistory() {
+      const el = document.getElementById('report-history-list')
+      if (!el) return
+      const list = JSON.parse(ls.getItem(REPORT_HISTORY_KEY) || '[]')
+      if (list.length === 0) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--muted)">还没有生成过周报</div>'
+        return
+      }
+      el.innerHTML = list.map(h => {
+        const date = new Date(h.createdAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        const tagClass = h.isPolished ? 'polished' : 'original'
+        const tagText = h.isPolished ? 'AI润色' : '原始'
+        const preview = h.text.slice(0, 30).replace(/\n/g, ' ') + '…'
+        return `
+          <div class="report-history-item" onclick="showReportHistoryDetail('${h.id}')">
+            <div class="rh-title">${escapeHtml(h.childName)} · ${escapeHtml(preview)}
+              <span class="rh-tag ${tagClass}">${tagText}</span>
+            </div>
+            <div class="rh-meta">${date} · ${(h.images || []).length} 张照片</div>
+          </div>
+        `
+      }).join('')
+    }
+    // 查看历史周报详情
+    function showReportHistoryDetail(id) {
+      const list = JSON.parse(ls.getItem(REPORT_HISTORY_KEY) || '[]')
+      const h = list.find(x => x.id === id)
+      if (!h) return
+      const date = new Date(h.createdAt).toLocaleString('zh-CN')
+      const tag = h.isPolished ? 'AI润色版' : '原始版'
+      document.getElementById('rh-detail-title').textContent = `${escapeHtml(h.childName)} · ${tag} · ${date}`
+      const imageHtml = (h.images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('rh-detail-body').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(h.text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+      document.getElementById('report-history-detail').classList.add('active')
+      lockBodyScroll()
+    }
+    function closeReportHistoryDetail() {
+      document.getElementById('report-history-detail').classList.remove('active')
+      unlockBodyScroll()
+    }
+    function genReport() {
+      const cls = getCurrentClass()
+      const childSel = document.getElementById('w-child')
+      const childId = childSel.value
+      if (!childId) return alert('当前班级还没有孩子')
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+      const records = cls.records.filter(r => ((r.childIds) || []).includes(childId) && r.date >= weekAgo)
+      if (records.length === 0) return alert('这个孩子最近7天还没有记录')
+      const childName = childSel.options[childSel.selectedIndex].text
+      const byArea = {}
+      records.forEach(r => { (byArea[r.area] = byArea[r.area] || []).push(r) })
+      const areaLines = Object.entries(byArea)
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([area, rs]) => {
+          const quote = rs[rs.length - 1].text.slice(0, 50)
+          return `【${area}】本周参与 ${rs.length} 次。代表性表现：「${quote}…」`
+        })
+      const today = new Date().toISOString().slice(0, 10)
+      const reportText = `🌟 ${childName} 本周成长周报（${weekAgo} ~ ${today}）\n本周共记录 ${records.length} 个精彩瞬间：\n\n${areaLines.join('\n\n')}\n\n💡 老师的话：________________\n\n如想了解更多细节，欢迎和老师交流～`
+      const images = []
+      records.forEach(r => {
+        (r.images || []).forEach(img => { if (!images.includes(img)) images.push(img) })
+      })
+      currentReportImages = images
+      currentReportChildId = childId
+      currentReportChildName = childName
+      renderReport(reportText, images)
+      saveReportHistory(reportText, images, false)
+    }
+    function exportReportImage() {
+      if (!currentReportImages.length && !document.getElementById('w-out').innerText.trim())
+        return alert('请先生成周报')
+      const scale = 2
+      const maxWidth = 600
+      const padding = 24
+      const lineHeight = 24
+      const fontSize = 16
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      ctx.font = fontSize + 'px sans-serif'
+      const textLines = wrapText(ctx, document.getElementById('w-out').innerText, maxWidth)
+      const textHeight = textLines.length * lineHeight
+      const imgSize = (maxWidth - 8) / 2
+      const imgGap = 8
+      const imgRows = Math.ceil(currentReportImages.length / 2)
+      const imgHeight = imgRows > 0 ? imgRows * (imgSize + imgGap) : 0
+      const contentHeight = textHeight + (imgHeight > 0 ? 12 + imgHeight : 0)
+      const totalW = maxWidth + padding * 2
+      const totalH = contentHeight + padding * 2
+      canvas.width = totalW * scale
+      canvas.height = totalH * scale
+      ctx.scale(scale, scale)
+      ctx.fillStyle = '#FFFDF5'
+      ctx.fillRect(0, 0, totalW, totalH)
+      ctx.fillStyle = '#5D4037'
+      ctx.font = fontSize + 'px sans-serif'
+      ctx.textBaseline = 'top'
+      let y = padding
+      textLines.forEach(line => { ctx.fillText(line, padding, y); y += lineHeight })
+      if (currentReportImages.length > 0) {
+        y += 12
+        let pending = currentReportImages.length
+        currentReportImages.forEach((src, i) => {
+          const col = i % 2, row = Math.floor(i / 2)
+          const x = padding + col * (imgSize + imgGap)
+          const iy = y + row * (imgSize + imgGap)
+          const img = new Image()
+          img.onload = () => {
+            const ratio = Math.min(imgSize / img.width, imgSize / img.height)
+            const dw = img.width * ratio, dh = img.height * ratio
+            ctx.drawImage(img, x + (imgSize - dw) / 2, iy + (imgSize - dh) / 2, dw, dh)
+            ctx.strokeStyle = '#E0C97F'
+            ctx.lineWidth = 1
+            ctx.strokeRect(x, iy, imgSize, imgSize)
+            if (--pending === 0) downloadCanvas(canvas)
+          }
+          img.onerror = () => { if (--pending === 0) downloadCanvas(canvas) }
+          img.src = src
+        })
+      } else {
+        downloadCanvas(canvas)
+      }
+    }
+    function downloadCanvas(canvas, filename) {
+      const url = canvas.toDataURL('image/png')
+      if (isIOS) {
+        // iOS：新窗口显示图片，用户长按保存
+        const win = window.open()
+        if (win) {
+          win.document.write('<html><head><meta charset="utf-8"><title>' + (filename || '图片') + '</title><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:20px;text-align:center;background:#222;">')
+          win.document.write('<p style="color:#fff;font-size:14px;margin-bottom:12px;">请长按图片，选择「存储图像」保存到相册</p>')
+          win.document.write('<img src="' + url + '" style="max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);">')
+          win.document.write('</body></html>')
+          win.document.close()
+        }
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename || '周报-' + new Date().toISOString().slice(0, 10) + '.png'
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
+        document.body.appendChild(a)
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+        }, 5000)
+      }
+      alert('周报图片已导出 ✅')
+    }
+    function wrapText(ctx, text, maxWidth) {
+      const lines = []
+      String(text).split('\n').forEach(para => {
+        if (para === '') { lines.push(''); return }
+        let line = ''
+        for (const ch of para) {
+          const test = line + ch
+          if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line); line = ch
+          } else { line = test }
+        }
+        if (line) lines.push(line)
+      })
+      return lines
+    }
+
+    /* ============ 幼儿观察记录 ============ */
+    const OBSERVATION_HISTORY_KEY = 'jiayuan-observation-history'
+    let currentObservationImages = []
+    let currentObservationChildId = ''
+    let currentObservationChildName = ''
+    let currentObservationText = ''
+
+    function renderObservation(text, images) {
+      const imageHtml = (images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('obs-out').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+    }
+
+    function saveObservationHistory(text, images, isPolished) {
+      const list = JSON.parse(ls.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      list.unshift({
+        id: Date.now().toString(),
+        childId: currentObservationChildId,
+        childName: currentObservationChildName,
+        text,
+        images: images || [],
+        isPolished: !!isPolished,
+        createdAt: new Date().toISOString()
+      })
+      if (list.length > 50) list.length = 50
+      ls.setItem(OBSERVATION_HISTORY_KEY, JSON.stringify(list))
+      renderObservationHistory()
+    }
+
+    function renderObservationHistory() {
+      const el = document.getElementById('obs-history-list')
+      if (!el) return
+      const list = JSON.parse(ls.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      if (list.length === 0) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--muted)">还没有生成过观察记录</div>'
+        return
+      }
+      el.innerHTML = list.map(h => {
+        const date = new Date(h.createdAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        const tagClass = h.isPolished ? 'polished' : 'original'
+        const tagText = h.isPolished ? 'AI润色' : '原始'
+        const preview = h.text.slice(0, 30).replace(/\n/g, ' ') + '…'
+        return `
+          <div class="report-history-item" onclick="showObservationHistoryDetail('${h.id}')">
+            <div class="rh-title">${escapeHtml(h.childName)} · ${escapeHtml(preview)}
+              <span class="rh-tag ${tagClass}">${tagText}</span>
+            </div>
+            <div class="rh-meta">${date} · ${(h.images || []).length} 张照片</div>
+          </div>
+        `
+      }).join('')
+    }
+
+    function showObservationHistoryDetail(id) {
+      const list = JSON.parse(ls.getItem(OBSERVATION_HISTORY_KEY) || '[]')
+      const h = list.find(x => x.id === id)
+      if (!h) return
+      const date = new Date(h.createdAt).toLocaleString('zh-CN')
+      const tag = h.isPolished ? 'AI润色版' : '原始版'
+      document.getElementById('obs-detail-title').textContent = `${escapeHtml(h.childName)} · ${tag} · ${date}`
+      const imageHtml = (h.images || []).slice(0, 6).map(img => `<img src="${img}" alt="精彩瞬间">`).join('')
+      document.getElementById('obs-detail-body').innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(h.text)}</div>` +
+        (imageHtml ? `<div style="margin-top:10px">${imageHtml}</div>` : '')
+      document.getElementById('obs-history-detail').classList.add('active')
+      lockBodyScroll()
+    }
+
+    function closeObservationHistoryDetail() {
+      document.getElementById('obs-history-detail').classList.remove('active')
+      unlockBodyScroll()
+    }
+
+    /* ============ 点名册 ============ */
+    const ATTENDANCE_KEY = 'jiayuan-attendance'
+    let currentAttendanceMonth = ''
+    let currentAttendanceData = {}
+
+    function openAttendanceModal() {
+      const modal = document.getElementById('attendance-modal')
+      modal.style.display = 'flex'
+      lockBodyScroll()
+      const now = new Date()
+      const monthStr = now.toISOString().slice(0, 7)
+      document.getElementById('attendance-month').value = monthStr
+      currentAttendanceMonth = monthStr
+      renderAttendanceTable()
+    }
+
+    function closeAttendanceModal() {
+      document.getElementById('attendance-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+
+    function getAttendanceData(classId, month) {
+      const all = JSON.parse(ls.getItem(ATTENDANCE_KEY) || '{}')
+      return (all[classId] && all[classId][month]) || {}
+    }
+
+    function saveAttendanceData() {
+      const cls = getCurrentClass()
+      const month = document.getElementById('attendance-month').value
+      if (!month) return alert('请选择月份')
+      const children = cls.children || []
+      const data = {}
+      children.forEach(child => {
+        data[child.id] = { am: {}, pm: {} }
+        const inputs = document.querySelectorAll(`[data-attend-child="${child.id}"]`)
+        inputs.forEach(input => {
+          const day = input.dataset.day
+          const period = input.dataset.period
+          const val = input.value.trim()
+          if (val) data[child.id][period][day] = val
+        })
+      })
+      const all = JSON.parse(ls.getItem(ATTENDANCE_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(ATTENDANCE_KEY, JSON.stringify(all))
+      alert('体温数据已保存 ✅')
+    }
+
+    function getWorkdays(year, month) {
+      const days = []
+      const d = new Date(year, month - 1, 1)
+      while (d.getMonth() === month - 1) {
+        const dayOfWeek = d.getDay()
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          days.push(d.getDate())
+        }
+        d.setDate(d.getDate() + 1)
+      }
+      return days
+    }
+
+    function renderAttendanceTable() {
+      const container = document.getElementById('attendance-table-container')
+      const cls = getCurrentClass()
+      const children = cls.children || []
+      if (children.length === 0) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">当前班级还没有孩子</p>'
+        return
+      }
+      const monthVal = document.getElementById('attendance-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        return
+      }
+      currentAttendanceMonth = monthVal
+      const [year, month] = monthVal.split('-').map(Number)
+      const workdays = getWorkdays(year, month)
+      const saved = getAttendanceData(cls.id, monthVal)
+
+      let html = '<table style="border-collapse:collapse;font-size:12px;white-space:nowrap;">'
+      html += '<thead><tr style="background:#FFF3E0;">'
+      html += '<th style="border:1px solid #E0C97F;padding:4px;min-width:56px;">姓名</th>'
+      html += '<th style="border:1px solid #E0C97F;padding:4px;min-width:36px;">上/下午</th>'
+      workdays.forEach(day => {
+        html += `<th style="border:1px solid #E0C97F;padding:4px;min-width:34px;font-size:11px;">${day}日</th>`
+      })
+      html += '</tr></thead><tbody>'
+
+      children.forEach(child => {
+        const childData = saved[child.id] || { am: {}, pm: {} }
+        ;['am', 'pm'].forEach((period, idx) => {
+          const periodLabel = period === 'am' ? '上午' : '下午'
+          const bg = idx === 0 ? '#FFFBF0' : '#FFFFFF'
+          html += `<tr style="background:${bg};">`
+          if (idx === 0) {
+            html += `<td rowspan="2" style="border:1px solid #E0C97F;padding:4px;text-align:center;font-weight:bold;font-size:12px;">${escapeHtml(child.name)}</td>`
+          }
+          html += `<td style="border:1px solid #E0C97F;padding:4px;text-align:center;font-size:11px;">${periodLabel}</td>`
+          workdays.forEach(day => {
+            const val = childData[period][day] || ''
+            html += `<td style="border:1px solid #E0C97F;padding:2px;"><input type="text" data-attend-child="${child.id}" data-day="${day}" data-period="${period}" value="${val}" placeholder="℃" style="width:100%;margin:0;padding:2px;border:none;text-align:center;font-size:11px;box-sizing:border-box;"></td>`
+          })
+          html += '</tr>'
+        })
+      })
+
+      html += '</tbody></table>'
+      container.innerHTML = html
+    }
+
+    function exportAttendanceExcel() {
+      const cls = getCurrentClass()
+      const children = cls.children || []
+      if (children.length === 0) return alert('当前班级还没有孩子')
+      const monthVal = document.getElementById('attendance-month').value
+      if (!monthVal) return alert('请选择月份')
+      const [year, month] = monthVal.split('-').map(Number)
+      const workdays = getWorkdays(year, month)
+      const saved = getAttendanceData(cls.id, monthVal)
+      const totalCols = 2 + workdays.length
+
+      // 列宽定义（像素，基于原始 xls 的 width/256*10 换算）
+      const colNameW = 74
+      const colAmpmW = 71
+      const colDateW = 50
+
+      // 样式辅助函数
+      const TD = (content, opts = {}) => {
+        const style = []
+        if (opts.fs) style.push(`font-size:${opts.fs}pt`)
+        if (opts.h) style.push(`height:${opts.h}pt`)
+        if (opts.w) style.push(`width:${opts.w}px`)
+        if (opts.bd) style.push('border:0.5pt solid #000000')
+        if (opts.bd === false) style.push('border:none')
+        if (opts.ta) style.push(`text-align:${opts.ta}`)
+        if (opts.va) style.push(`vertical-align:${opts.va}`)
+        if (opts.rs) return `<td rowspan="${opts.rs}" style="${style.join(';')};font-family:宋体,SimSun">${content}</td>`
+        if (opts.cs) return `<td colspan="${opts.cs}" style="${style.join(';')};font-family:宋体,SimSun">${content}</td>`
+        return `<td style="${style.join(';')};font-family:宋体,SimSun">${content}</td>`
+      }
+
+      let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta charset="UTF-8">
+</head>
+<body>
+<table style="border-collapse:collapse;font-family:宋体,SimSun">`
+
+      // 标题行：高26pt，宋体20pt，居中，无边框
+      html += `<tr>${TD('临清市第四幼儿园晨、午检记录表', { cs: totalCols, fs: 20, h: 26, ta: 'center', va: 'middle', bd: false })}</tr>\n`
+
+      // 班级行：高21pt，宋体14pt，居中，无边框
+      html += `<tr>${TD('', { w: colNameW, fs: 14, h: 21, bd: false })}${TD(`${cls.name}班&nbsp;&nbsp;&nbsp;&nbsp;${year}年${month}月`, { cs: totalCols - 1, fs: 14, h: 21, ta: 'center', va: 'middle', bd: false })}</tr>\n`
+
+      // 日期行：高15pt，宋体12pt
+      html += `<tr>${TD('', { w: colNameW, fs: 12, h: 15, bd: false })}${TD('时间（日）', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle' })}`
+      workdays.forEach(d => { html += TD(`${d}日`, { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
+      html += `</tr>\n`
+
+      // 表头行：高15pt，宋体12pt
+      html += `<tr>${TD('姓名', { w: colNameW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle' })}${TD('', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
+      workdays.forEach(() => { html += TD('体温', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
+      html += `</tr>\n`
+
+      // 数据行：高15pt，宋体12pt
+      children.forEach(child => {
+        const childData = saved[child.id] || { am: {}, pm: {} }
+        // 上午行
+        html += `<tr>${TD(child.name, { w: colNameW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle', rs: 2 })}${TD('上午', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
+        workdays.forEach(d => { html += TD(childData.am[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
+        html += `</tr>\n`
+        // 下午行
+        html += `<tr>${TD('下午', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
+        workdays.forEach(d => { html += TD(childData.pm[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
+        html += `</tr>\n`
+      })
+
+      html += `</table></body></html>`
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, `点名册-${cls.name}-${year}年${month}月.xls`)
+      alert('点名册已导出 ✅')
+    }
+
+    /* ================= 园所表格公共：园历日期 + Excel 导出样式 ================= */
+    const TABLEDATES_KEY = 'jiayuan-table-dates'
+
+    function localMonthStr() {
+      const d = new Date()
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+    }
+    function getTableDates(cls, monthVal) {
+      const all = JSON.parse(ls.getItem(TABLEDATES_KEY) || '{}')
+      const d = (all[cls.id] && all[cls.id][monthVal]) || null
+      return (d && d.length) ? d.slice().sort((a, b) => a - b) : null
+    }
+    function saveTableDates(cls, monthVal, days) {
+      const all = JSON.parse(ls.getItem(TABLEDATES_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      if (days === null) delete all[cls.id][monthVal]
+      else all[cls.id][monthVal] = days.slice().sort((a, b) => a - b)
+      ls.setItem(TABLEDATES_KEY, JSON.stringify(all))
+    }
+    // 优先用本班本月自定义的园历日期，没有则默认周一至周五
+    function resolveDates(cls, monthVal) {
+      const custom = getTableDates(cls, monthVal)
+      if (custom) return custom
+      const [y, m] = monthVal.split('-').map(Number)
+      return getWorkdays(y, m)
+    }
+    function renderDateBar(formKey) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      if (!monthVal) return ''
+      const [, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      let h = '<div class="chipbar"><span style="font-size:12px;color:var(--muted)">园历日期（' + days.length + ' 天）：</span>'
+      days.forEach(d => {
+        h += '<span class="chip">' + m + '月' + d + '日<button onclick="removeTableDate(\'' + formKey + '\',' + d + ')" title="删除这天">×</button></span>'
+      })
+      h += '<input type="date" id="' + formKey + '-adddate" class="datebar-input">'
+      h += '<button class="datebar-btn" onclick="addTableDate(\'' + formKey + '\')">＋加这天</button>'
+      h += '<button class="datebar-btn gray" onclick="resetTableDates(\'' + formKey + '\')">↺恢复周一至周五</button>'
+      h += '</div>'
+      return h
+    }
+    function addTableDate(formKey) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      const v = document.getElementById(formKey + '-adddate').value
+      if (!v) return alert('请先在日期框里选择要添加的日子')
+      const [y, m, d] = v.split('-').map(Number)
+      if (y + '-' + String(m).padStart(2, '0') !== monthVal) return alert('请添加 ' + monthVal + ' 当月内的日期')
+      const days = resolveDates(cls, monthVal)
+      if (days.indexOf(d) === -1) days.push(d)
+      saveTableDates(cls, monthVal, days)
+      rerenderForm(formKey)
+    }
+    function removeTableDate(formKey, d) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      saveTableDates(cls, monthVal, resolveDates(cls, monthVal).filter(x => x !== d))
+      rerenderForm(formKey)
+    }
+    function resetTableDates(formKey) {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById(formKey + '-month').value
+      if (!confirm('恢复为「周一至周五」，将清除本班本月的自定义日期。已填写的内容不会丢失，继续？')) return
+      saveTableDates(cls, monthVal, null)
+      rerenderForm(formKey)
+    }
+    function rerenderForm(formKey) {
+      if (formKey === 'obs-form') renderObsForm()
+      else if (formKey === 'dis') renderDis()
+      else if (formKey === 'han') renderHan()
+    }
+
+    // 导出用单元格：精确控制字体、字号、行高、列宽、边框、对齐
+    function xTd(content, o) {
+      o = o || {}
+      const s = []
+      s.push('font-family:' + (o.ff || '宋体,SimSun'))
+      s.push('font-size:' + (o.fs || 12) + 'pt')
+      if (o.h) s.push('height:' + o.h + 'pt')
+      if (o.w) s.push('width:' + o.w + 'px')
+      if (o.bd === false) s.push('border:none')
+      else if (o.bd === 'top') s.push('border-top:0.5pt solid #000000;border-left:none;border-right:none;border-bottom:none')
+      else s.push('border:0.5pt solid #000000')
+      s.push('text-align:' + (o.ta || 'center'))
+      s.push('vertical-align:' + (o.va || 'middle'))
+      s.push(o.nowrap ? 'white-space:nowrap' : 'white-space:normal')
+      let attr = ''
+      if (o.rs) attr += ' rowspan="' + o.rs + '"'
+      if (o.cs) attr += ' colspan="' + o.cs + '"'
+      return '<td' + attr + ' style="' + s.join(';') + '">' + content + '</td>'
+    }
+    function xlsColGroup(widths) {
+      return '<colgroup>' + widths.map(w => '<col style="width:' + w + 'px">').join('') + '</colgroup>'
+    }
+    function xlsDoc(tableHtml) {
+      return '<html xmlns:o="urn:schemas-microsoft-com:office:office"\n      xmlns:x="urn:schemas-microsoft-com:office:excel">\n<head><meta charset="UTF-8">\n</head>\n<body>\n' + tableHtml + '\n</body></html>'
+    }
+
+    /* ================= 全日制观察记录表 ================= */
+    const OBSFORM_KEY = 'jiayuan-obsform'
+    // 列宽（px）：A列沿用原始 xls 默认宽 ≈64px，B~R 合并为「幼儿情况」，S 列 78px
+    const OBS_W = [64, 45, 52, 49, 50, 55, 60, 57, 45, 56, 51, 50, 51, 47, 51, 44, 41, 70, 78]
+
+    function openObsFormModal() {
+      document.getElementById('obs-form-modal').style.display = 'flex'
+      lockBodyScroll()
+      document.getElementById('obs-form-month').value = localMonthStr()
+      renderObsForm()
+    }
+    function closeObsFormModal() {
+      document.getElementById('obs-form-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function getObsFormData(cls, month) {
+      const all = JSON.parse(ls.getItem(OBSFORM_KEY) || '{}')
+      return (all[cls.id] && all[cls.id][month]) || {}
+    }
+    function saveObsForm(silent) {
+      const cls = getCurrentClass()
+      const month = document.getElementById('obs-form-month').value
+      if (!month) return alert('请选择月份')
+      const data = {}
+      document.querySelectorAll('[data-obs-note]').forEach(el => {
+        const d = el.dataset.obsNote
+        data[d] = data[d] || {}
+        data[d].note = el.value
+      })
+      document.querySelectorAll('[data-obs-teacher]').forEach(el => {
+        const d = el.dataset.obsTeacher
+        data[d] = data[d] || {}
+        data[d].teacher = el.value
+      })
+      const footEl = document.querySelector('[data-obs-foot]')
+      if (footEl) data.__foot = footEl.value
+      const all = JSON.parse(ls.getItem(OBSFORM_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(OBSFORM_KEY, JSON.stringify(all))
+      if (!silent) alert('全日制观察记录表已保存 ✅')
+    }
+    function renderObsForm() {
+      const container = document.getElementById('obs-form-table-container')
+      const bar = document.getElementById('obs-form-dates')
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('obs-form-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        bar.innerHTML = ''
+        return
+      }
+      const [, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getObsFormData(cls, monthVal)
+      let h = '<table class="formtable" style="min-width:420px;width:100%;">'
+      h += '<tr><th style="min-width:64px">日期</th><th colspan="17" style="min-width:200px">幼儿情况（请假、生病、早接、状态、大便等）</th><th style="min-width:86px">记录教师</th></tr>'
+      days.forEach(d => {
+        const r = data[d] || {}
+        h += '<tr>'
+        h += '<td class="c-date">' + m + '月' + d + '日</td>'
+        h += '<td class="c-txt" colspan="17"><input type="text" data-obs-note="' + d + '" value="' + escapeHtml(r.note || '') + '" placeholder="填写幼儿情况"></td>'
+        h += '<td class="c-sign"><input type="text" data-obs-teacher="' + d + '" value="' + escapeHtml(r.teacher || '') + '" placeholder="签字"></td>'
+        h += '</tr>'
+      })
+      h += '</table>'
+      h += '<div style="margin-top:12px;"><label style="font-size:12px;color:var(--muted);">表尾备注（会一并导出到表格最下方，可留空）</label>'
+      h += '<textarea data-obs-foot rows="2" placeholder="表尾备注">' + escapeHtml(data.__foot || '') + '</textarea></div>'
+      container.innerHTML = h
+      bar.innerHTML = renderDateBar('obs-form')
+    }
+    function exportObsFormExcel() {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('obs-form-month').value
+      if (!monthVal) return alert('请选择月份')
+      saveObsForm(true)
+      const [year, month] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getObsFormData(cls, monthVal)
+      let h = '<table style="border-collapse:collapse;">'
+      h += xlsColGroup(OBS_W)
+      // 标题：高37pt，宋体20pt，居中，无边框
+      h += '<tr>' + xTd('临清市第四幼儿园（' + year + '年&nbsp;&nbsp;&nbsp;&nbsp;' + escapeHtml(cls.name) + '班 ）全日制观察记录表', { cs: 19, fs: 20, h: 37, bd: false, nowrap: true }) + '</tr>'
+      // 空行：高26pt，仅上边框
+      h += '<tr>' + OBS_W.map(w => xTd('', { w: w, fs: 12, h: 26, bd: 'top' })).join('') + '</tr>'
+      // 表头：高37pt，宋体12pt
+      h += '<tr>' + xTd('日期', { w: OBS_W[0], fs: 12, h: 37, nowrap: true })
+        + xTd('幼儿情况（请假、生病、早接、状态、大便等）', { cs: 17, fs: 12, h: 37 })
+        + xTd('记录教师', { w: OBS_W[18], fs: 12, h: 37 }) + '</tr>'
+      // 数据行：高44pt，宋体12pt
+      days.forEach(d => {
+        const r = data[d] || {}
+        h += '<tr>' + xTd(month + '月' + d + '日', { w: OBS_W[0], fs: 12, h: 44, ta: 'left', nowrap: true })
+          + xTd(escapeHtml(r.note || ''), { cs: 17, fs: 12, h: 44 })
+          + xTd(escapeHtml(r.teacher || ''), { w: OBS_W[18], fs: 12, h: 44 }) + '</tr>'
+      })
+      // 表尾：高92pt，合并整行，无边框
+      h += '<tr>' + xTd(escapeHtml(data.__foot || ''), { cs: 19, fs: 12, h: 92, bd: false }) + '</tr>'
+      h += '</table>'
+      const blob = new Blob([xlsDoc(h)], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, '全日制观察记录表-' + cls.name + '-' + year + '年' + month + '月.xls')
+      alert('观察记录表已导出 ✅')
+    }
+
+    /* ================= 通风消毒记录表 ================= */
+    const DIS_KEY = 'jiayuan-disinfect'
+    const DIS_W = [64, 45, 52, 49, 50, 55, 60, 57, 45, 56, 51, 50, 51, 47, 51, 44, 41, 70, 78]
+    const DIS_HEAD = ['日期', '走廊', '活动室', '休息<br>室', '卫生间', '活动室地面', '卫生间地面', '洗手池', '便池', '水龙头',
+      '门窗', '桌椅', '玩具柜', '床架', '被褥', '水杯', '毛巾', '塑料玩具', '消毒人签字']
+    const DIS_NOTE = '说明： 一、填表方式：在已完成相应的通风、消毒栏内打 √  二、通风方法：每日通风不少于3次，每次不少于30分钟，时间：上午7:30-—8:00中午11:30——12:00 下午17:50—-18:20  三、消毒时间和方法：1.活动室地面、卫生间地面、洗手池、便池先用清水冲洗，然后用比例1:100的含氯消毒剂擦拭、作用30分钟后用清水洗净，早晨：7:00——7:30中午：11:10--11:40 下午：18:00—18:20,每天消毒三次。2.水龙头、门窗框、门把手用75%的酒精擦拭，桌椅、玩具柜、床架先用清水冲洗，然后用比例1:200的含氯消毒剂擦拭，作用30分钟后用清水洗净，每天消毒三次， 3.被褥室外阳光下暴晒一小时，每周一上午10:00-11:00暴晒一次。4.水杯洗净消毒柜消毒。每天18:10——18:20消毒一次。5.毛巾、塑料玩具消毒用洗涤剂浸泡、搓洗，清水清洗干净后，置阳光直接照射下晒干，每天上午11:30—12:30每天消毒一次。 每周五下午18:30——18:50  紫外线消毒。'
+
+    function openDisModal() {
+      document.getElementById('dis-modal').style.display = 'flex'
+      lockBodyScroll()
+      document.getElementById('dis-month').value = localMonthStr()
+      renderDis()
+    }
+    function closeDisModal() {
+      document.getElementById('dis-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function getDisData(cls, month) {
+      const all = JSON.parse(ls.getItem(DIS_KEY) || '{}')
+      return (all[cls.id] && all[cls.id][month]) || {}
+    }
+    function toggleDisSq(el) {
+      const on = el.textContent.trim() === '√'
+      el.textContent = on ? '' : '√'
+      el.classList.toggle('on', !on)
+    }
+    function saveDis(silent) {
+      const cls = getCurrentClass()
+      const month = document.getElementById('dis-month').value
+      if (!month) return alert('请选择月份')
+      const data = {}
+      document.querySelectorAll('[data-dis-day]').forEach(el => {
+        const d = el.dataset.disDay
+        const c = el.dataset.disCol
+        data[d] = data[d] || {}
+        data[d][c] = el.textContent.trim()
+      })
+      document.querySelectorAll('[data-dis-sign]').forEach(el => {
+        const d = el.dataset.disSign
+        data[d] = data[d] || {}
+        data[d].sign = el.value
+      })
+      const all = JSON.parse(ls.getItem(DIS_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(DIS_KEY, JSON.stringify(all))
+      if (!silent) alert('通风消毒记录表已保存 ✅')
+    }
+    function splitBlocks(days) {
+      const half = Math.ceil(days.length / 2)
+      return [days.slice(0, half), days.slice(half)].filter(b => b.length)
+    }
+    function renderDis() {
+      const container = document.getElementById('dis-table-container')
+      const bar = document.getElementById('dis-dates')
+      const noteEl = document.getElementById('dis-note')
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('dis-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        bar.innerHTML = ''
+        noteEl.textContent = ''
+        return
+      }
+      const [, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getDisData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table class="formtable">'
+      h += '<tr><td class="ft-title" colspan="19">临清市第四幼儿园（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班教室夏季各类设施通风、消毒记录表</td></tr>'
+      blocks.forEach(block => {
+        h += '<tr><th rowspan="2" style="min-width:60px">日期</th><th class="ft-group" colspan="4">通风</th><th class="ft-group" colspan="14">消毒</th></tr>'
+        h += '<tr>' + DIS_HEAD.slice(1).map(x => '<th style="min-width:38px">' + x + '</th>').join('') + '</tr>'
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr><td class="c-date">' + m + '月' + d + '日</td>'
+          for (let c = 1; c <= 17; c++) {
+            h += '<td class="cell-sq' + (r[c] === '√' ? ' on' : '') + '" data-dis-day="' + d + '" data-dis-col="' + c + '" onclick="toggleDisSq(this)">' + (r[c] || '') + '</td>'
+          }
+          h += '<td class="c-sign"><input type="text" data-dis-sign="' + d + '" value="' + escapeHtml(r.sign || '') + '" placeholder="签字"></td>'
+          h += '</tr>'
+        })
+      })
+      h += '</table>'
+      container.innerHTML = h
+      bar.innerHTML = renderDateBar('dis')
+      noteEl.textContent = DIS_NOTE
+    }
+    function exportDisExcel() {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('dis-month').value
+      if (!monthVal) return alert('请选择月份')
+      saveDis(true)
+      const [year, month] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getDisData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table style="border-collapse:collapse;">'
+      h += xlsColGroup(DIS_W)
+      // 标题：高39pt，宋体20pt，居中，无边框
+      h += '<tr>' + xTd('临清市第四幼儿园（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班教室夏季各类设施通风、消毒记录表', { cs: 19, fs: 20, h: 39, bd: false, nowrap: true }) + '</tr>'
+      // 分组行：高26pt，宋体12pt
+      h += '<tr>' + xTd('', { w: DIS_W[0], fs: 12, h: 26 })
+        + xTd('通风', { cs: 4, fs: 12, h: 26 })
+        + xTd('消毒', { cs: 14, fs: 12, h: 26 }) + '</tr>'
+      blocks.forEach(block => {
+        // 表头：高42pt，宋体12pt
+        h += '<tr>' + DIS_HEAD.map((x, i) => xTd(x, { w: DIS_W[i], fs: 12, h: 42 })).join('') + '</tr>'
+        // 数据行：高35pt，宋体12pt
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr>' + xTd(month + '月' + d + '日', { w: DIS_W[0], fs: 12, h: 35, ta: 'left', nowrap: true })
+          for (let c = 1; c <= 17; c++) h += xTd(r[c] || '', { w: DIS_W[c], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.sign || ''), { w: DIS_W[18], fs: 12, h: 35 }) + '</tr>'
+        })
+      })
+      // 说明行：高92pt，合并整行，无边框
+      h += '<tr>' + xTd(escapeHtml(DIS_NOTE), { cs: 19, fs: 12, h: 92, bd: false }) + '</tr>'
+      h += '</table>'
+      const blob = new Blob([xlsDoc(h)], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, '通风消毒记录表-' + cls.name + '-' + year + '年' + month + '月.xls')
+      alert('消毒记录表已导出 ✅')
+    }
+
+    /* ================= 交接班记录表 ================= */
+    const HAN_KEY = 'jiayuan-handover'
+    const HAN_W = [42, 58, 61, 56, 331, 114, 114, 114]
+    const HAN_FF_TITLE = '方正小标宋简体,SimSun,宋体,serif'
+    const HAN_FF_HEAD = '仿宋_GB2312,FangSong,仿宋,serif'
+
+    function openHanModal() {
+      document.getElementById('han-modal').style.display = 'flex'
+      lockBodyScroll()
+      document.getElementById('han-month').value = localMonthStr()
+      renderHan()
+    }
+    function closeHanModal() {
+      document.getElementById('han-modal').style.display = 'none'
+      unlockBodyScroll()
+    }
+    function getHanData(cls, month) {
+      const all = JSON.parse(ls.getItem(HAN_KEY) || '{}')
+      return (all[cls.id] && all[cls.id][month]) || {}
+    }
+    function saveHan(silent) {
+      const cls = getCurrentClass()
+      const month = document.getElementById('han-month').value
+      if (!month) return alert('请选择月份')
+      const data = {}
+      document.querySelectorAll('[data-han-day]').forEach(el => {
+        const d = el.dataset.hanDay
+        const f = el.dataset.hanF
+        data[d] = data[d] || {}
+        data[d][f] = el.value
+      })
+      const all = JSON.parse(ls.getItem(HAN_KEY) || '{}')
+      if (!all[cls.id]) all[cls.id] = {}
+      all[cls.id][month] = data
+      ls.setItem(HAN_KEY, JSON.stringify(all))
+      if (!silent) alert('交接班记录表已保存 ✅')
+    }
+    function renderHan() {
+      const container = document.getElementById('han-table-container')
+      const bar = document.getElementById('han-dates')
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('han-month').value
+      if (!monthVal) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;">请选择月份</p>'
+        bar.innerHTML = ''
+        return
+      }
+      const [y, m] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getHanData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table class="formtable" style="min-width:640px;">'
+      h += '<tr><td class="ft-title" colspan="8">&nbsp;&nbsp;第四幼儿园' + y + '年' + m + '月（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班交接班记录</td></tr>'
+      blocks.forEach(block => {
+        h += '<tr>'
+        h += '<th rowspan="2" style="min-width:54px">日期</th>'
+        h += '<th rowspan="2" style="min-width:52px">幼儿<br>应到</th>'
+        h += '<th rowspan="2" style="min-width:52px">幼儿<br>实到</th>'
+        h += '<th rowspan="2" style="min-width:52px">幼儿<br>缺勤</th>'
+        h += '<th rowspan="2" style="min-width:170px">幼儿在园情况</th>'
+        h += '<th class="ft-group" colspan="3">交接班时间下午14:30</th>'
+        h += '</tr>'
+        h += '<tr><th style="min-width:78px">交班教师</th><th style="min-width:78px">接班教师</th><th style="min-width:78px">接班教师</th></tr>'
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr>'
+          h += '<td class="c-date">' + d + '日</td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="should" value="' + escapeHtml(r.should || '') + '" placeholder="应到"></td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="actual" value="' + escapeHtml(r.actual || '') + '" placeholder="实到"></td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="absent" value="' + escapeHtml(r.absent || '') + '" placeholder="缺勤"></td>'
+          h += '<td class="c-txt"><input type="text" data-han-day="' + d + '" data-han-f="situation" value="' + escapeHtml(r.situation || '') + '" placeholder="幼儿在园情况"></td>'
+          h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t1" value="' + escapeHtml(r.t1 || '') + '" placeholder="交班"></td>'
+          h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t2" value="' + escapeHtml(r.t2 || '') + '" placeholder="接班"></td>'
+          h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t3" value="' + escapeHtml(r.t3 || '') + '" placeholder="接班"></td>'
+          h += '</tr>'
+        })
+      })
+      h += '</table>'
+      container.innerHTML = h
+      bar.innerHTML = renderDateBar('han')
+    }
+    function exportHanExcel() {
+      const cls = getCurrentClass()
+      const monthVal = document.getElementById('han-month').value
+      if (!monthVal) return alert('请选择月份')
+      saveHan(true)
+      const [year, month] = monthVal.split('-').map(Number)
+      const days = resolveDates(cls, monthVal)
+      const data = getHanData(cls, monthVal)
+      const blocks = splitBlocks(days)
+      let h = '<table style="border-collapse:collapse;">'
+      h += xlsColGroup(HAN_W)
+      // 标题：高42pt，方正小标宋简体12pt，居中，无边框
+      h += '<tr>' + xTd('&nbsp;&nbsp;第四幼儿园' + year + '年' + month + '月（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班交接班记录', { cs: 8, fs: 12, ff: HAN_FF_TITLE, h: 42, bd: false, nowrap: true }) + '</tr>'
+      blocks.forEach(block => {
+        // 表头第一行：高42pt，仿宋_GB2312 14pt
+        h += '<tr>'
+        h += xTd('日期', { w: HAN_W[0], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2, nowrap: true })
+        h += xTd('幼儿<br>应到', { w: HAN_W[1], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('幼儿<br>实到', { w: HAN_W[2], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('幼儿<br>缺勤', { w: HAN_W[3], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('幼儿在园情况', { w: HAN_W[4], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
+        h += xTd('交接班时间下午14:30', { cs: 3, fs: 14, ff: HAN_FF_HEAD, h: 42 })
+        h += '</tr>'
+        // 表头第二行：高39pt，仿宋_GB2312 14pt
+        h += '<tr>'
+        h += xTd('交班教师', { w: HAN_W[5], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += xTd('接班教师', { w: HAN_W[6], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += xTd('接班教师', { w: HAN_W[7], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += '</tr>'
+        // 数据行：高35pt，宋体12pt
+        block.forEach(d => {
+          const r = data[d] || {}
+          h += '<tr>'
+          h += xTd(d + '日', { w: HAN_W[0], fs: 12, h: 35, nowrap: true })
+          h += xTd(escapeHtml(r.should || ''), { w: HAN_W[1], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.actual || ''), { w: HAN_W[2], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.absent || ''), { w: HAN_W[3], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.situation || ''), { w: HAN_W[4], fs: 12, h: 35, ta: 'left' })
+          h += xTd(escapeHtml(r.t1 || ''), { w: HAN_W[5], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.t2 || ''), { w: HAN_W[6], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.t3 || ''), { w: HAN_W[7], fs: 12, h: 35 })
+          h += '</tr>'
+        })
+      })
+      h += '</table>'
+      const blob = new Blob([xlsDoc(h)], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      downloadBlob(blob, '交接班记录-' + cls.name + '-' + year + '年' + month + '月.xls')
+      alert('交接班记录表已导出 ✅')
+    }
+
+    function genObservation() {
+      const cls = getCurrentClass()
+      const childSel = document.getElementById('obs-child')
+      const childId = childSel.value
+      if (!childId) return alert('当前班级还没有孩子')
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+      const records = cls.records.filter(r => ((r.childIds) || []).includes(childId) && r.date >= weekAgo)
+      if (records.length === 0) return alert('这个孩子最近7天还没有记录')
+      const childName = childSel.options[childSel.selectedIndex].text
+      const child = cls.children.find(c => c.id === childId)
+      const gender = child && child.gender ? child.gender : '____'
+      const age = child && child.birthday ? calcAge(child.birthday) : '____'
+      const className = cls.name
+      const today = new Date().toISOString().slice(0, 10)
+
+      const areaMap = {}
+      records.forEach(r => { (areaMap[r.area] = areaMap[r.area] || []).push(r) })
+      const areaDescs = Object.entries(areaMap)
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([area, rs]) => {
+          const texts = rs.map(r => r.text).join('；')
+          return `在${area}，${texts}。`
+        })
+
+      const mainArea = Object.keys(areaMap).sort((a, b) => areaMap[b].length - areaMap[a].length)[0] || '____'
+      const obsTime = records.map(r => r.date).sort()[0] || today
+
+      const observationText = `观察对象：${childName}    性别：${gender}    年龄：${age}岁    班级：${className}
+记录教师：_________
+
+所在区：${mainArea}    观察时间：${obsTime}
+
+一、观察情况记录：
+${areaDescs.join('\n')}
+
+二、分析与评价（结合《3-6岁幼儿学习与发展指南》《幼儿园教育指导纲要》）：
+幼儿行为表现分析：________________________________________
+对应的发展领域与关键经验：________________________________________
+个体差异与发展水平评估：________________________________________
+
+三、教师介入及策略：
+即时回应与支持：________________________________________
+环境材料调整：________________________________________
+家园共育建议：________________________________________
+
+四、结论与反思：
+观察结论：________________________________________
+教师反思：________________________________________
+后续跟进计划：________________________________________`
+
+      const images = []
+      records.forEach(r => {
+        (r.images || []).forEach(img => { if (!images.includes(img)) images.push(img) })
+      })
+      currentObservationImages = images
+      currentObservationChildId = childId
+      currentObservationChildName = childName
+      currentObservationText = observationText
+      renderObservation(observationText, images)
+      saveObservationHistory(observationText, images, false)
+    }
+
+    function calcAge(birthday) {
+      const birth = new Date(birthday)
+      const now = new Date()
+      let age = now.getFullYear() - birth.getFullYear()
+      const m = now.getMonth() - birth.getMonth()
+      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
+      return age > 0 ? age : 1
+    }
+
+    async function polishObservation() {
+      const apiKey = getKey()
+      if (!apiKey) return alert('请先在「设置」里填写 DeepSeek API Key')
+      if (!currentObservationText) return alert('请先生成观察记录')
+      if (!confirm('将用 AI 润色并补全观察记录（消耗约几分钱），是否继续？')) return
+      try {
+        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: '你是一位资深幼儿园教研员，擅长基于《3-6岁幼儿学习与发展指南》《幼儿园教育指导纲要》《幼儿园保育教育质量评估指南》等专业文件，撰写高质量的幼儿观察记录。\n\n要求：\n1. 分析与评价部分必须结合指南和纲要中的发展目标、教育建议，分析幼儿行为背后对应的发展领域（健康、语言、社会、科学、艺术）和关键经验，指出该幼儿当前的发展水平及个体差异。\n2. 教师介入及策略要具体可操作，包含即时回应、环境材料调整、家园共育建议三个维度。\n3. 结论与反思要体现教师的专业思考，包含观察结论、教师自身反思、后续跟进计划。\n4. 语言温暖专业，避免空洞套话，内容具体有针对性。\n5. 只返回润色后的完整观察记录正文，不要解释。' },
+              { role: 'user', content: currentObservationText }
+            ],
+            temperature: 0.6
+          })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const data = await res.json()
+        const polished = data.choices[0].message.content.trim()
+        renderObservation(polished, currentObservationImages)
+        saveObservationHistory(polished, currentObservationImages, true)
+        alert('AI 润色完成 ✨')
+      } catch (e) {
+        alert('AI 润色失败（' + e.message + '），已保留原有模板文字。')
+      }
+    }
+
+    function exportObservationImage() {
+      if (!currentObservationText && !document.getElementById('obs-out').innerText.trim())
+        return alert('请先生成观察记录')
+      const scale = 2
+      const maxWidth = 600
+      const padding = 24
+      const lineHeight = 24
+      const fontSize = 16
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      ctx.font = fontSize + 'px sans-serif'
+      const textLines = wrapText(ctx, document.getElementById('obs-out').innerText, maxWidth)
+      const textHeight = textLines.length * lineHeight
+      const imgSize = (maxWidth - 8) / 2
+      const imgGap = 8
+      const imgRows = Math.ceil(currentObservationImages.length / 2)
+      const imgHeight = imgRows > 0 ? imgRows * (imgSize + imgGap) : 0
+      const contentHeight = textHeight + (imgHeight > 0 ? 12 + imgHeight : 0)
+      const totalW = maxWidth + padding * 2
+      const totalH = contentHeight + padding * 2
+      canvas.width = totalW * scale
+      canvas.height = totalH * scale
+      ctx.scale(scale, scale)
+      ctx.fillStyle = '#FFFDF5'
+      ctx.fillRect(0, 0, totalW, totalH)
+      ctx.fillStyle = '#5D4037'
+      ctx.font = fontSize + 'px sans-serif'
+      ctx.textBaseline = 'top'
+      let y = padding
+      textLines.forEach(line => { ctx.fillText(line, padding, y); y += lineHeight })
+      if (currentObservationImages.length > 0) {
+        y += 12
+        let pending = currentObservationImages.length
+        currentObservationImages.forEach((src, i) => {
+          const col = i % 2, row = Math.floor(i / 2)
+          const x = padding + col * (imgSize + imgGap)
+          const iy = y + row * (imgSize + imgGap)
+          const img = new Image()
+          img.onload = () => {
+            const ratio = Math.min(imgSize / img.width, imgSize / img.height)
+            const dw = img.width * ratio, dh = img.height * ratio
+            ctx.drawImage(img, x + (imgSize - dw) / 2, iy + (imgSize - dh) / 2, dw, dh)
+            ctx.strokeStyle = '#E0C97F'
+            ctx.lineWidth = 1
+            ctx.strokeRect(x, iy, imgSize, imgSize)
+            if (--pending === 0) downloadObservationCanvas(canvas)
+          }
+          img.onerror = () => { if (--pending === 0) downloadObservationCanvas(canvas) }
+          img.src = src
+        })
+      } else {
+        downloadObservationCanvas(canvas)
+      }
+    }
+
+    function downloadObservationCanvas(canvas) {
+      const filename = '观察记录-' + (currentObservationChildName || '未命名') + '-' + new Date().toISOString().slice(0, 10) + '.png'
+      const url = canvas.toDataURL('image/png')
+      if (isIOS) {
+        const win = window.open()
+        if (win) {
+          win.document.write('<html><head><meta charset="utf-8"><title>' + filename + '</title><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:20px;text-align:center;background:#222;">')
+          win.document.write('<p style="color:#fff;font-size:14px;margin-bottom:12px;">请长按图片，选择「存储图像」保存到相册</p>')
+          win.document.write('<img src="' + url + '" style="max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);">')
+          win.document.write('</body></html>')
+          win.document.close()
+        }
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.style.position = 'fixed'
+        a.style.top = '-9999px'
+        a.style.left = '-9999px'
+        document.body.appendChild(a)
+        const evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null)
+        a.dispatchEvent(evt)
+        setTimeout(() => {
+          if (a.parentNode) a.parentNode.removeChild(a)
+        }, 5000)
+      }
+      alert('观察记录图片已导出 ✅')
+    }
+
+    /* ============ 设置 / 备份 / AI 润色 ============ */
+    function saveKey() {
+      const key = document.getElementById('s-key').value.trim()
+      if (!key) return alert('请输入密钥')
+      ls.setItem('jiayuan-deepseek-key', key)
+      alert('密钥已保存（仅存本机浏览器）✅')
+    }
+    function getKey() {
+      return ls.getItem('jiayuan-deepseek-key') || ''
+    }
+    async function exportBackup() {
+      const db = load()
+      const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' })
+      await downloadBlob(blob, 'jiayuan-backup-' + new Date().toISOString().slice(0, 10) + '.json')
+      alert('已导出备份文件 ✅')
+    }
+    function importBackup(input) {
+      const file = input.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = e => {
+        try {
+          const data = JSON.parse(e.target.result)
+          if (!data || !Array.isArray(data.classes)) {
+            return alert('备份文件格式不正确，缺少 classes 数据')
+          }
+          if (!confirm('导入备份会覆盖当前所有数据（' + (data.classes.length || 0) + ' 个班级），确定继续吗？')) {
+            input.value = ''
+            return
+          }
+          ls.setItem(STORE_KEY, JSON.stringify(data))
+          renderAll()
+          input.value = ''
+          alert('备份导入成功 ✅')
+        } catch (err) {
+          alert('文件解析失败：' + err.message)
+          input.value = ''
+        }
+      }
+      reader.readAsText(file)
+    }
+    async function polishReport() {
+      const apiKey = getKey()
+      if (!apiKey) return alert('请先在「设置」里填写 DeepSeek API Key')
+      const out = document.getElementById('w-out')
+      const base = (out.innerText || out.textContent || '').trim()
+      if (!base) return alert('请先生成周报文字')
+      if (!confirm('将用 AI 润色当前周报（消耗约几分钱），是否继续？')) return
+      try {
+        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: '你是一位幼儿园老师，擅长把孩子的成长记录润色成温暖、生动、适合发给家长的周报文字。只返回润色后的正文，不要解释。' },
+              { role: 'user', content: base }
+            ],
+            temperature: 0.6
+          })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const data = await res.json()
+        const polished = data.choices[0].message.content.trim()
+        renderReport(polished, currentReportImages)
+        saveReportHistory(polished, currentReportImages, true)
+        alert('AI 润色完成 ✨')
+      } catch (e) {
+        alert('AI 润色失败（' + e.message + '），已保留原有模板文字。')
+      }
+    }
+
+    /* ============ 底部Tab切换 ============ */
+    function switchTab(name, btn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+      document.getElementById('page-' + name).classList.add('active')
+      document.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    function goTab(name) {
+      const btns = document.querySelectorAll('.tabbar button')
+      const map = { home: 0, record: 1, report: 2, kids: 3, settings: 4 }
+      const idx = map[name]
+      if (btns[idx]) switchTab(name, btns[idx])
+    }
+
+    renderAll()
+    setInterval(updateHeroTime, 30000)
+  
