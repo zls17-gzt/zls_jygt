@@ -1297,6 +1297,7 @@
       if (o.w) s.push('width:' + o.w + 'px')
       if (o.bd === false) s.push('border:none')
       else if (o.bd === 'top') s.push('border-top:0.5pt solid #000000;border-left:none;border-right:none;border-bottom:none')
+      else if (o.bd === 'lt') s.push('border-left:0.5pt solid #000000;border-top:0.5pt solid #000000;border-right:none;border-bottom:none')
       else s.push('border:0.5pt solid #000000')
       s.push('text-align:' + (o.ta || 'center'))
       s.push('vertical-align:' + (o.va || 'middle'))
@@ -1396,18 +1397,20 @@
       h += xlsColGroup(OBS_W)
       // 标题：高37pt，宋体20pt，居中，无边框
       h += '<tr>' + xTd('临清市第四幼儿园（' + year + '年&nbsp;&nbsp;&nbsp;&nbsp;' + escapeHtml(cls.name) + '班 ）全日制观察记录表', { cs: 19, fs: 20, h: 37, bd: false, nowrap: true }) + '</tr>'
-      // 空行：高26pt，仅上边框
-      h += '<tr>' + OBS_W.map(w => xTd('', { w: w, fs: 12, h: 26, bd: 'top' })).join('') + '</tr>'
+      // 空行：高26pt，仅日期列（首列）保留左+上边框（与原表一致）
+      h += '<tr>'
+      OBS_W.forEach((w, i) => { h += xTd('', { w: w, fs: 12, h: 26, bd: i === 0 ? 'lt' : false }) })
+      h += '</tr>'
       // 表头：高37pt，宋体12pt
       h += '<tr>' + xTd('日期', { w: OBS_W[0], fs: 12, h: 37, nowrap: true })
         + xTd('幼儿情况（请假、生病、早接、状态、大便等）', { cs: 17, fs: 12, h: 37 })
         + xTd('记录教师', { w: OBS_W[18], fs: 12, h: 37 }) + '</tr>'
-      // 数据行：高44pt，宋体12pt
+      // 数据行：高44pt，宋体12pt，日期/情况/签字均为左对齐（与原表 general 对齐一致）
       days.forEach(d => {
         const r = data[d] || {}
         h += '<tr>' + xTd(month + '月' + d + '日', { w: OBS_W[0], fs: 12, h: 44, ta: 'left', nowrap: true })
-          + xTd(escapeHtml(r.note || ''), { cs: 17, fs: 12, h: 44 })
-          + xTd(escapeHtml(r.teacher || ''), { w: OBS_W[18], fs: 12, h: 44 }) + '</tr>'
+          + xTd(escapeHtml(r.note || ''), { cs: 17, fs: 12, h: 44, ta: 'left' })
+          + xTd(escapeHtml(r.teacher || ''), { w: OBS_W[18], fs: 12, h: 44, ta: 'left' }) + '</tr>'
       })
       // 表尾：高92pt，合并整行，无边框
       h += '<tr>' + xTd(escapeHtml(data.__foot || ''), { cs: 19, fs: 12, h: 92, bd: false }) + '</tr>'
@@ -1469,6 +1472,10 @@
       const half = Math.ceil(days.length / 2)
       return [days.slice(0, half), days.slice(half)].filter(b => b.length)
     }
+    // 交接班表按原表版式：上半部分 10 天，其余归入下半部分（原表 9 月为 10/12）
+    function splitBlocksHan(days) {
+      return [days.slice(0, 10), days.slice(10)].filter(b => b.length)
+    }
     function renderDis() {
       const container = document.getElementById('dis-table-container')
       const bar = document.getElementById('dis-dates')
@@ -1516,21 +1523,29 @@
       const blocks = splitBlocks(days)
       let h = '<table style="border-collapse:collapse;">'
       h += xlsColGroup(DIS_W)
+      const disTotal = days.length
+      let disIdx = 0
       // 标题：高39pt，宋体20pt，居中，无边框
       h += '<tr>' + xTd('临清市第四幼儿园（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班教室夏季各类设施通风、消毒记录表', { cs: 19, fs: 20, h: 39, bd: false, nowrap: true }) + '</tr>'
-      // 分组行：高26pt，宋体12pt
-      h += '<tr>' + xTd('', { w: DIS_W[0], fs: 12, h: 26 })
-        + xTd('通风', { cs: 4, fs: 12, h: 26 })
-        + xTd('消毒', { cs: 14, fs: 12, h: 26 }) + '</tr>'
-      blocks.forEach(block => {
-        // 表头：高42pt，宋体12pt
-        h += '<tr>' + DIS_HEAD.map((x, i) => xTd(x, { w: DIS_W[i], fs: 12, h: 42 })).join('') + '</tr>'
-        // 数据行：高35pt，宋体12pt
+      // 分组行「通风/消毒」仅在第一个数据块前出现一次（原表如此）
+      blocks.forEach((block, bi) => {
+        if (bi === 0) {
+          h += '<tr>' + xTd('', { w: DIS_W[0], fs: 12, h: 26 })
+            + xTd('通风', { cs: 4, fs: 12, h: 26 })
+            + xTd('消毒', { cs: 14, fs: 12, h: 26 }) + '</tr>'
+        }
+        // 表头：第一块高42pt；原表在中间重复表头时高度降为35pt（与数据同高）
+        const hdrH = bi === 0 ? 42 : 35
+        h += '<tr>' + DIS_HEAD.map((x, i) => xTd(x, { w: DIS_W[i], fs: 12, h: hdrH })).join('') + '</tr>'
+        // 数据行：高35pt，宋体12pt，全部左对齐（与原表 general 对齐一致）
+        // 末两行沿用原表高度 29/25pt（原表 9 月末尾两行）
         block.forEach(d => {
           const r = data[d] || {}
-          h += '<tr>' + xTd(month + '月' + d + '日', { w: DIS_W[0], fs: 12, h: 35, ta: 'left', nowrap: true })
-          for (let c = 1; c <= 17; c++) h += xTd(r[c] || '', { w: DIS_W[c], fs: 12, h: 35 })
-          h += xTd(escapeHtml(r.sign || ''), { w: DIS_W[18], fs: 12, h: 35 }) + '</tr>'
+          const gi = ++disIdx
+          const dh = gi === disTotal ? 25 : (gi === disTotal - 1 ? 29 : 35)
+          h += '<tr>' + xTd(month + '月' + d + '日', { w: DIS_W[0], fs: 12, h: dh, ta: 'left', nowrap: true })
+          for (let c = 1; c <= 17; c++) h += xTd(r[c] || '', { w: DIS_W[c], fs: 12, h: dh, ta: 'left' })
+          h += xTd(escapeHtml(r.sign || ''), { w: DIS_W[18], fs: 12, h: dh, ta: 'left' }) + '</tr>'
         })
       })
       // 说明行：高92pt，合并整行，无边框
@@ -1591,7 +1606,7 @@
       const [y, m] = monthVal.split('-').map(Number)
       const days = resolveDates(cls, monthVal)
       const data = getHanData(cls, monthVal)
-      const blocks = splitBlocks(days)
+      const blocks = splitBlocksHan(days)
       let h = '<table class="formtable" style="min-width:640px;">'
       h += '<tr><td class="ft-title" colspan="8">&nbsp;&nbsp;第四幼儿园' + y + '年' + m + '月（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班交接班记录</td></tr>'
       blocks.forEach(block => {
@@ -1630,39 +1645,41 @@
       const [year, month] = monthVal.split('-').map(Number)
       const days = resolveDates(cls, monthVal)
       const data = getHanData(cls, monthVal)
-      const blocks = splitBlocks(days)
+      const blocks = splitBlocksHan(days)
       let h = '<table style="border-collapse:collapse;">'
       h += xlsColGroup(HAN_W)
       // 标题：高42pt，方正小标宋简体12pt，居中，无边框
       h += '<tr>' + xTd('&nbsp;&nbsp;第四幼儿园' + year + '年' + month + '月（&nbsp;&nbsp;' + escapeHtml(cls.name) + '&nbsp;&nbsp;）班交接班记录', { cs: 8, fs: 12, ff: HAN_FF_TITLE, h: 42, bd: false, nowrap: true }) + '</tr>'
-      blocks.forEach(block => {
-        // 表头第一行：高42pt，仿宋_GB2312 14pt
+      blocks.forEach((block, bi) => {
+        // 表头第一行：第一块高42pt，第二块高35pt（原表下半部分重复表头降为35pt）
+        const h1 = bi === 0 ? 42 : 35
+        const h2 = bi === 0 ? 39 : 35
         h += '<tr>'
-        h += xTd('日期', { w: HAN_W[0], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2, nowrap: true })
-        h += xTd('幼儿<br>应到', { w: HAN_W[1], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
-        h += xTd('幼儿<br>实到', { w: HAN_W[2], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
-        h += xTd('幼儿<br>缺勤', { w: HAN_W[3], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
-        h += xTd('幼儿在园情况', { w: HAN_W[4], fs: 14, ff: HAN_FF_HEAD, h: 42, rs: 2 })
-        h += xTd('交接班时间下午14:30', { cs: 3, fs: 14, ff: HAN_FF_HEAD, h: 42 })
+        h += xTd('日期', { w: HAN_W[0], fs: 14, ff: HAN_FF_HEAD, h: h1, rs: 2, nowrap: true })
+        h += xTd('幼儿<br>应到', { w: HAN_W[1], fs: 14, ff: HAN_FF_HEAD, h: h1, rs: 2 })
+        h += xTd('幼儿<br>实到', { w: HAN_W[2], fs: 14, ff: HAN_FF_HEAD, h: h1, rs: 2 })
+        h += xTd('幼儿<br>缺勤', { w: HAN_W[3], fs: 14, ff: HAN_FF_HEAD, h: h1, rs: 2 })
+        h += xTd('幼儿在园情况', { w: HAN_W[4], fs: 14, ff: HAN_FF_HEAD, h: h1, rs: 2 })
+        h += xTd('交接班时间下午14:30', { cs: 3, fs: 14, ff: HAN_FF_HEAD, h: h1 })
         h += '</tr>'
-        // 表头第二行：高39pt，仿宋_GB2312 14pt
+        // 表头第二行
         h += '<tr>'
-        h += xTd('交班教师', { w: HAN_W[5], fs: 14, ff: HAN_FF_HEAD, h: 39 })
-        h += xTd('接班教师', { w: HAN_W[6], fs: 14, ff: HAN_FF_HEAD, h: 39 })
-        h += xTd('接班教师', { w: HAN_W[7], fs: 14, ff: HAN_FF_HEAD, h: 39 })
+        h += xTd('交班教师', { w: HAN_W[5], fs: 14, ff: HAN_FF_HEAD, h: h2 })
+        h += xTd('接班教师', { w: HAN_W[6], fs: 14, ff: HAN_FF_HEAD, h: h2 })
+        h += xTd('接班教师', { w: HAN_W[7], fs: 14, ff: HAN_FF_HEAD, h: h2 })
         h += '</tr>'
-        // 数据行：高35pt，宋体12pt
+        // 数据行：高35pt，宋体12pt，日期居中、其余左对齐（与原表一致）
         block.forEach(d => {
           const r = data[d] || {}
           h += '<tr>'
           h += xTd(d + '日', { w: HAN_W[0], fs: 12, h: 35, nowrap: true })
-          h += xTd(escapeHtml(r.should || ''), { w: HAN_W[1], fs: 12, h: 35 })
-          h += xTd(escapeHtml(r.actual || ''), { w: HAN_W[2], fs: 12, h: 35 })
-          h += xTd(escapeHtml(r.absent || ''), { w: HAN_W[3], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.should || ''), { w: HAN_W[1], fs: 12, h: 35, ta: 'left' })
+          h += xTd(escapeHtml(r.actual || ''), { w: HAN_W[2], fs: 12, h: 35, ta: 'left' })
+          h += xTd(escapeHtml(r.absent || ''), { w: HAN_W[3], fs: 12, h: 35, ta: 'left' })
           h += xTd(escapeHtml(r.situation || ''), { w: HAN_W[4], fs: 12, h: 35, ta: 'left' })
-          h += xTd(escapeHtml(r.t1 || ''), { w: HAN_W[5], fs: 12, h: 35 })
-          h += xTd(escapeHtml(r.t2 || ''), { w: HAN_W[6], fs: 12, h: 35 })
-          h += xTd(escapeHtml(r.t3 || ''), { w: HAN_W[7], fs: 12, h: 35 })
+          h += xTd(escapeHtml(r.t1 || ''), { w: HAN_W[5], fs: 12, h: 35, ta: 'left' })
+          h += xTd(escapeHtml(r.t2 || ''), { w: HAN_W[6], fs: 12, h: 35, ta: 'left' })
+          h += xTd(escapeHtml(r.t3 || ''), { w: HAN_W[7], fs: 12, h: 35, ta: 'left' })
           h += '</tr>'
         })
       })

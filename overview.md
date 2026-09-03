@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v41**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v42**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -46,7 +46,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（底部 Tab 栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v41） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v42） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |
