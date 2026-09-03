@@ -46,7 +46,7 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主应用（底部 Tab 栏 + 奶油黄可爱风格） |
-| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v20） |
+| `sw.js` | 离线缓存（CACHE_NAME = jiayuan-v41） |
 | `manifest.json` | PWA 安装名片 |
 | `icon-192.png` / `icon-512.png` | 安装图标 |
 | `icons/` | 从素材图裁出的 9 张卡通图标 |
@@ -80,4 +80,13 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 
 ## 下次注意
 
-如果再次修改代码，请继续把 `sw.js` 里的 `CACHE_NAME` 升级到 v14、v15…，否则已安装的 PWA 会缓存旧版页面。
+1. 如果再次修改代码，请继续把 `sw.js` 里的 `CACHE_NAME` 升级到 v42、v43…，否则已安装的 PWA 会缓存旧版页面。
+2. **推送失败的解决办法**：本机环境变量里有代理 `http://127.0.0.1:61803`，它经常对 `github.com` 返回 `502 CONNECT tunnel failed`，导致 `git push` 反复失败。绕过它即可成功：
+
+   ```bash
+   env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+     git -c http.proxy= -c https.proxy= -c credential.helper= \
+     push "https://zls17-gzt:<PAT>@github.com/zls17-gzt/zls_jygt.git" main
+   ```
+
+   （`credential.helper` 默认是 GitHub Desktop 的 `helper-selector`，直连时会取不到凭据，所以要显式带上 PAT。）
