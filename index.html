@@ -1761,6 +1761,18 @@
       return days
     }
 
+    // 体温下拉选项：可选项（35.5~39.9 每 0.1 度）+ △（没来）
+    function attendanceTempOptions(val) {
+      const norm = (val == null ? '' : String(val)).trim()
+      let h = `<option value="" ${norm === '' ? 'selected' : ''}>℃</option>`
+      for (let i = 355; i <= 399; i++) {
+        const tv = (i / 10).toFixed(1)
+        h += `<option value="${tv}" ${norm === tv ? 'selected' : ''}>${tv}</option>`
+      }
+      h += `<option value="△" ${norm === '△' ? 'selected' : ''}>△（没来）</option>`
+      return h
+    }
+
     function renderAttendanceTable() {
       const container = document.getElementById('attendance-table-container')
       const cls = getCurrentClass()
@@ -1800,7 +1812,7 @@
           html += `<td style="border:1px solid #E0C97F;padding:4px;text-align:center;font-size:11px;">${periodLabel}</td>`
           workdays.forEach(day => {
             const val = childData[period][day] || ''
-            html += `<td style="border:1px solid #E0C97F;padding:2px;"><input type="text" data-attend-child="${child.id}" data-day="${day}" data-period="${period}" value="${val}" placeholder="℃" style="width:100%;margin:0;padding:2px;border:none;text-align:center;font-size:11px;box-sizing:border-box;"></td>`
+            html += `<td style="border:1px solid #E0C97F;padding:2px;"><select data-attend-child="${child.id}" data-day="${day}" data-period="${period}" style="width:100%;margin:0;padding:2px;border:none;text-align:center;font-size:11px;box-sizing:border-box;background:#fff;cursor:pointer;">${attendanceTempOptions(val)}</select></td>`
           })
           html += '</tr>'
         })
