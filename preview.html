@@ -609,7 +609,9 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <input type="month" id="han-month" onchange="renderHan()" style="width:auto;margin:0;">
+        <input type="text" id="han-teacher-cycle" placeholder="教师轮换顺序,如 袁利利,周晓丽" onchange="saveHanTeacherCycle()" style="width:auto;min-width:220px;margin:0;">
         <button onclick="exportHanExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="generateHan()" style="width:auto;background:#FFF3E0;color:#E65100;">一键生成</button>
         <button onclick="saveHan()" style="width:auto;">保存</button>
       </div>
       <div id="han-dates"></div>
@@ -2313,7 +2315,11 @@
       document.getElementById('han-modal').style.display = 'flex'
       lockBodyScroll()
       document.getElementById('han-month').value = localMonthStr()
+      document.getElementById('han-teacher-cycle').value = ls.getItem('jiayuan-han-teacher-cycle') || ''
       renderHan()
+    }
+    function saveHanTeacherCycle() {
+      ls.setItem('jiayuan-han-teacher-cycle', document.getElementById('han-teacher-cycle').value || '')
     }
     function closeHanModal() {
       document.getElementById('han-modal').style.display = 'none'
@@ -2383,6 +2389,52 @@
       h += '</table>'
       container.innerHTML = h
       bar.innerHTML = renderDateBar('han')
+    }
+    // 一键生成：幼儿在园情况未填→一切正常；交班教师按顺序轮流；接班教师填其余名字；幼儿应到→全班人数
+    function generateHan() {
+      const month = document.getElementById('han-month').value
+      if (!month) return alert('请先选择月份')
+      const cls = getCurrentClass()
+      // 1) 幼儿在园情况：未填 → 一切正常
+      let nSit = 0
+      document.querySelectorAll('#han-table-container [data-han-f="situation"]').forEach(el => {
+        if (el.value.trim() === '') { el.value = '一切正常'; nSit++ }
+      })
+      // 2) 教师：轮换顺序（交班轮流，接班填其余名字）
+      const cycRaw = (document.getElementById('han-teacher-cycle').value || '').trim()
+      const names = cycRaw ? cycRaw.split(/[\s,，、]+/).filter(Boolean) : []
+      if (names.length === 0) {
+        alert('已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」。\n交班/接班教师未填轮换顺序：请在上方「教师轮换顺序」框输入老师姓名（逗号分隔，如 袁利利,周晓丽）后再点一键生成。')
+        return
+      }
+      const rows = [...document.querySelectorAll('#han-table-container [data-han-day]')]
+      // 按日期排序后逐行取 day 顺序（data-han-day 即日期数字）
+      const days = [...new Set(rows.map(el => el.dataset.hanDay))].sort((a, b) => a - b)
+      let nT1 = 0, nT2 = 0, nT3 = 0
+      days.forEach((d, i) => {
+        const t1 = names[i % names.length]
+        const rest = names.filter(x => x !== t1)
+        const t1El = document.querySelector('[data-han-day="' + d + '"][data-han-f="t1"]')
+        const t2El = document.querySelector('[data-han-day="' + d + '"][data-han-f="t2"]')
+        const t3El = document.querySelector('[data-han-day="' + d + '"][data-han-f="t3"]')
+        if (t1El && t1El.value.trim() === '') { t1El.value = t1; nT1++ }
+        if (t2El && t2El.value.trim() === '') { t2El.value = rest[0] || ''; nT2++ }
+        if (t3El && t3El.value.trim() === '') { t3El.value = rest[1] || ''; nT3++ }
+      })
+      // 3) 幼儿应到：未填 → 全班人数（花名册人数）
+      const total = (cls.children || []).length
+      let nShould = 0
+      if (total > 0) {
+        document.querySelectorAll('#han-table-container [data-han-f="should"]').forEach(el => {
+          if (el.value.trim() === '') { el.value = String(total); nShould++ }
+        })
+      }
+      let msg = '已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」；'
+      msg += '\n交班/接班教师按轮换顺序（' + names.join('、') + '）一天一交接自动填好（交班 ' + nT1 + '、接班 ' + (nT2 + nT3) + ' 格）；'
+      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天。'
+      else msg += '\n「幼儿应到」未填（当前班级花名册为空，请先在设置里添加幼儿）。'
+      msg += '\n点击「保存」即可持久化。'
+      alert(msg)
     }
     function exportHanExcel() {
       const cls = getCurrentClass()

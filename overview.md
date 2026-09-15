@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v52**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v53**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,14 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v53 · 交接班记录表一键生成）
+
+- 交接班记录表弹窗按钮区新增橙色「一键生成」按钮 + 「教师轮换顺序」输入框（`han-teacher-cycle`，逗号/空格分隔，存 `jiayuan-han-teacher-cycle` 持久化，open 时回填）。
+- `generateHan()` 逻辑：① 幼儿在园情况列（`data-han-f="situation"`）未填的填「一切正常」；② 交班教师（`t1`）按轮换顺序 `names[i % n]` 一天一个；③ 接班教师（`t2`/`t3`）填「除交班教师外的其余名字」（`names.filter(x=>x!==t1)`），已填不动；④ 幼儿应到（`should`）未填的填**全班人数**（取自 `cls.children.length`，花名册人数）。
+- 幼儿实到/缺勤列**未参与**自动填充，仍手动填（用户询问建议后暂留手动）。
+- 导出 Excel 版式不变，仍与原 xls 1:1。
+- `sw.js` 升级到 v53。
 
 ## 本次改动（v52 · 通风消毒记录表一键生成也支持记录老师轮换）
 
