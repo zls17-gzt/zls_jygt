@@ -566,7 +566,9 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <input type="month" id="obs-form-month" onchange="renderObsForm()" style="width:auto;margin:0;">
+        <input type="text" id="obs-teacher-cycle" placeholder="教师轮换顺序,如 袁利利,周晓丽,赵铭" onchange="saveObsTeacherCycle()" style="width:auto;min-width:220px;margin:0;">
         <button onclick="exportObsFormExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="generateObsForm()" style="width:auto;background:#FFF3E0;color:#E65100;">一键生成</button>
         <button onclick="saveObsForm()" style="width:auto;">保存</button>
       </div>
       <div id="obs-form-dates"></div>
@@ -2010,7 +2012,11 @@
       document.getElementById('obs-form-modal').style.display = 'flex'
       lockBodyScroll()
       document.getElementById('obs-form-month').value = localMonthStr()
+      document.getElementById('obs-teacher-cycle').value = ls.getItem('jiayuan-obs-teacher-cycle') || ''
       renderObsForm()
+    }
+    function saveObsTeacherCycle() {
+      ls.setItem('jiayuan-obs-teacher-cycle', document.getElementById('obs-teacher-cycle').value || '')
     }
     function closeObsFormModal() {
       document.getElementById('obs-form-modal').style.display = 'none'
@@ -2071,6 +2077,29 @@
       h += '<textarea data-obs-foot rows="2" placeholder="表尾备注">' + escapeHtml(data.__foot || '') + '</textarea></div>'
       container.innerHTML = h
       bar.innerHTML = renderDateBar('obs-form')
+    }
+    // 一键生成：幼儿情况未填的填空「一切正常」；记录教师按轮换顺序一天一个（已填不动）
+    function generateObsForm() {
+      const month = document.getElementById('obs-form-month').value
+      if (!month) return alert('请先选择月份')
+      // 1) 幼儿情况：未填的 -> 一切正常
+      let nNote = 0
+      document.querySelectorAll('#obs-form-table-container [data-obs-note]').forEach(el => {
+        if (el.value.trim() === '') { el.value = '一切正常'; nNote++ }
+      })
+      // 2) 记录教师：先手动填轮换顺序，再按顺序一天一个
+      const cycRaw = (document.getElementById('obs-teacher-cycle').value || '').trim()
+      const names = cycRaw ? cycRaw.split(/[\s,，、]+/).filter(Boolean) : []
+      if (names.length === 0) {
+        alert('已为 ' + nNote + ' 条「幼儿情况」填空为「一切正常」。\n记录教师列尚未填轮换顺序：请在上方「教师轮换顺序」框输入老师姓名（逗号分隔，如 袁利利,周晓丽,赵铭）后再点一键生成。')
+        return
+      }
+      const teachers = [...document.querySelectorAll('#obs-form-table-container [data-obs-teacher]')]
+      let nTea = 0
+      teachers.forEach((el, i) => {
+        if (el.value.trim() === '') { el.value = names[i % names.length]; nTea++ }
+      })
+      alert('已为 ' + nNote + ' 条「幼儿情况」填空为「一切正常」；\n「记录教师」按轮换顺序（' + names.join('、') + '）一天一个自动填好，共填 ' + nTea + ' 天。\n点击「保存」即可持久化。')
     }
     function exportObsFormExcel() {
       const cls = getCurrentClass()
