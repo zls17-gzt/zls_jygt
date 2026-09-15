@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v53**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v54**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -34,11 +34,19 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
 
+## 本次改动（v54 · 交接班幼儿实到自动计算）
+
+- 新增 `recomputeHanActual(refEl)`：交接班表中**缺勤**（`data-han-f="absent"`）或**应到**（`should`）任一变动时，自动把**实到**（`actual`）算成 `应到 − 缺勤`；缺勤为空按 0 计，实到不为负。两个输入框加 `oninput` 即时联动。
+- `generateHan()` 第 4 步：一键生成后，对每行调用 `recomputeHanActual`，使「幼儿实到」按「应到 − 缺勤（默认0）」自动算出（应到已默认填全班人数，故默认实到 = 全班人数）。
+- 幼儿实到输入框本身无 `oninput`，仍可手动覆盖（改完缺勤/应到会被公式重算）。
+- 导出 Excel 版式不变，仍与原 xls 1:1。
+- `sw.js` 升级到 v54。
+
 ## 本次改动（v53 · 交接班记录表一键生成）
 
 - 交接班记录表弹窗按钮区新增橙色「一键生成」按钮 + 「教师轮换顺序」输入框（`han-teacher-cycle`，逗号/空格分隔，存 `jiayuan-han-teacher-cycle` 持久化，open 时回填）。
 - `generateHan()` 逻辑：① 幼儿在园情况列（`data-han-f="situation"`）未填的填「一切正常」；② 交班教师（`t1`）按轮换顺序 `names[i % n]` 一天一个；③ 接班教师（`t2`/`t3`）填「除交班教师外的其余名字」（`names.filter(x=>x!==t1)`），已填不动；④ 幼儿应到（`should`）未填的填**全班人数**（取自 `cls.children.length`，花名册人数）。
-- 幼儿实到/缺勤列**未参与**自动填充，仍手动填（用户询问建议后暂留手动）。
+- 幼儿实到（`actual`）由 v54 起按「应到 − 缺勤」自动计算（见 v54），缺勤为空默认 0。
 - 导出 Excel 版式不变，仍与原 xls 1:1。
 - `sw.js` 升级到 v53。
 

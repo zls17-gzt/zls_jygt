@@ -2376,9 +2376,9 @@
           const r = data[d] || {}
           h += '<tr>'
           h += '<td class="c-date">' + d + '日</td>'
-          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="should" value="' + escapeHtml(r.should || '') + '" placeholder="应到"></td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="should" value="' + escapeHtml(r.should || '') + '" placeholder="应到" oninput="recomputeHanActual(this)"></td>'
           h += '<td><input type="text" data-han-day="' + d + '" data-han-f="actual" value="' + escapeHtml(r.actual || '') + '" placeholder="实到"></td>'
-          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="absent" value="' + escapeHtml(r.absent || '') + '" placeholder="缺勤"></td>'
+          h += '<td><input type="text" data-han-day="' + d + '" data-han-f="absent" value="' + escapeHtml(r.absent || '') + '" placeholder="缺勤" oninput="recomputeHanActual(this)"></td>'
           h += '<td class="c-txt"><input type="text" data-han-day="' + d + '" data-han-f="situation" value="' + escapeHtml(r.situation || '') + '" placeholder="幼儿在园情况"></td>'
           h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t1" value="' + escapeHtml(r.t1 || '') + '" placeholder="交班"></td>'
           h += '<td class="c-sign"><input type="text" data-han-day="' + d + '" data-han-f="t2" value="' + escapeHtml(r.t2 || '') + '" placeholder="接班"></td>'
@@ -2390,7 +2390,25 @@
       container.innerHTML = h
       bar.innerHTML = renderDateBar('han')
     }
-    // 一键生成：幼儿在园情况未填→一切正常；交班教师按顺序轮流；接班教师填其余名字；幼儿应到→全班人数
+    // 缺勤/应到变动时，自动计算 实到 = 应到 - 缺勤（缺勤为空按0计，实到不为负）
+    function recomputeHanActual(refEl) {
+      const d = refEl.getAttribute('data-han-day')
+      if (!d) return
+      const cls = getCurrentClass()
+      const total = (cls.children || []).length
+      const shouldEl = document.querySelector('[data-han-day="' + d + '"][data-han-f="should"]')
+      const absentEl = document.querySelector('[data-han-day="' + d + '"][data-han-f="absent"]')
+      const actualEl = document.querySelector('[data-han-day="' + d + '"][data-han-f="actual"]')
+      if (!actualEl) return
+      const sRaw = shouldEl ? shouldEl.value.trim() : ''
+      const aRaw = absentEl ? absentEl.value.trim() : ''
+      const s = sRaw === '' ? total : parseInt(sRaw, 10)
+      const a = aRaw === '' ? 0 : parseInt(aRaw, 10)
+      let act = (isNaN(s) ? total : s) - (isNaN(a) ? 0 : a)
+      if (act < 0) act = 0
+      actualEl.value = String(act)
+    }
+    // 一键生成：幼儿在园情况未填→一切正常；交班教师按顺序轮流；接班教师填其余名字；幼儿应到→全班人数；幼儿实到=应到-缺勤
     function generateHan() {
       const month = document.getElementById('han-month').value
       if (!month) return alert('请先选择月份')
@@ -2429,9 +2447,14 @@
           if (el.value.trim() === '') { el.value = String(total); nShould++ }
         })
       }
+      // 4) 幼儿实到 = 应到 - 缺勤（缺勤为空按0，实到不为负）
+      let nActual = 0
+      document.querySelectorAll('#han-table-container [data-han-f="should"]').forEach(el => {
+        recomputeHanActual(el); nActual++
+      })
       let msg = '已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」；'
       msg += '\n交班/接班教师按轮换顺序（' + names.join('、') + '）一天一交接自动填好（交班 ' + nT1 + '、接班 ' + (nT2 + nT3) + ' 格）；'
-      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天。'
+      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天；「幼儿实到」已按「应到 − 缺勤」自动算出 ' + nActual + ' 天。'
       else msg += '\n「幼儿应到」未填（当前班级花名册为空，请先在设置里添加幼儿）。'
       msg += '\n点击「保存」即可持久化。'
       alert(msg)
