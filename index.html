@@ -586,6 +586,7 @@
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <input type="month" id="dis-month" onchange="renderDis()" style="width:auto;margin:0;">
         <button onclick="exportDisExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="generateDis()" style="width:auto;background:#FFF3E0;color:#E65100;">一键生成</button>
         <button onclick="saveDis()" style="width:auto;">保存</button>
       </div>
       <div id="dis-dates"></div>
@@ -2210,6 +2211,24 @@
       container.innerHTML = h
       bar.innerHTML = renderDateBar('dis')
       noteEl.textContent = DIS_NOTE
+    }
+    // 一键生成：把未填的「√」格子（通风/消毒栏，1~17 列）自动打上 √（已填不动，签字栏不填）
+    function generateDis() {
+      const month = document.getElementById('dis-month').value
+      if (!month) return alert('请先选择月份')
+      let n = 0
+      document.querySelectorAll('#dis-table-container .cell-sq').forEach(el => {
+        if (el.textContent.trim() === '') {
+          el.textContent = '√'
+          el.classList.add('on')
+          n++
+        }
+      })
+      if (n === 0) {
+        alert('通风消毒记录表：没有需要填充的空格（已全部打上√或已填写）')
+        return
+      }
+      alert('已为 ' + n + ' 个空格自动打上 √\n点击「保存」即可持久化（签字栏请手动填写）')
     }
     function exportDisExcel() {
       const cls = getCurrentClass()
