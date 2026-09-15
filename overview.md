@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v54**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v55**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,14 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v55 · 交接班幼儿缺勤默认填 0）
+
+- 在 `generateHan()` 第 3.5 步：一键生成时，幼儿缺勤（`absent`）**未填的格子直接写入「0」**（全勤默认），而不只是计算实到时按 0 计。
+- 之后第 4 步仍调用 `recomputeHanActual`，使「幼儿实到」按「应到 − 缺勤(默认0)」自动算出（应到默认全班人数，故默认实到=全班人数）。
+- 实时录入（手动改缺勤/应到）逻辑不变：`recomputeHanActual` 仍把空缺勤按 0 计入实到，但不强制往框里写 0（保留手动留空习惯）。
+- 导出 Excel 版式不变，仍与原 xls 1:1。
+- `sw.js` 升级到 v55。
 
 ## 本次改动（v54 · 交接班幼儿实到自动计算）
 

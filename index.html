@@ -2460,14 +2460,19 @@
           if (el.value.trim() === '') { el.value = String(total); nShould++ }
         })
       }
-      // 4) 幼儿实到 = 应到 - 缺勤（缺勤为空按0，实到不为负）
+      // 3.5) 幼儿缺勤：未填 → 默认 0（全勤默认，明确写入单元格）
+      let nAbsent = 0
+      document.querySelectorAll('#han-table-container [data-han-f="absent"]').forEach(el => {
+        if (el.value.trim() === '') { el.value = '0'; nAbsent++ }
+      })
+      // 4) 幼儿实到 = 应到 - 缺勤（实到不为负）
       let nActual = 0
       document.querySelectorAll('#han-table-container [data-han-f="should"]').forEach(el => {
         recomputeHanActual(el); nActual++
       })
       let msg = '已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」；'
       msg += '\n交班/接班教师按轮换顺序（' + names.join('、') + '）一天一交接自动填好（交班 ' + nT1 + '、接班 ' + (nT2 + nT3) + ' 格）；'
-      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天；「幼儿实到」已按「应到 − 缺勤」自动算出 ' + nActual + ' 天。'
+      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天；「幼儿缺勤」默认填 0 共 ' + nAbsent + ' 天；「幼儿实到」已按「应到 − 缺勤」自动算出 ' + nActual + ' 天。'
       else msg += '\n「幼儿应到」未填（当前班级花名册为空，请先在设置里添加幼儿）。'
       msg += '\n点击「保存」即可持久化。'
       alert(msg)
