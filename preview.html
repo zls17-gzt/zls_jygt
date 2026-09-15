@@ -587,6 +587,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <input type="month" id="dis-month" onchange="renderDis()" style="width:auto;margin:0;">
+        <input type="text" id="dis-teacher-cycle" placeholder="教师轮换顺序,如 袁利利,周晓丽,赵铭" onchange="saveDisTeacherCycle()" style="width:auto;min-width:220px;margin:0;">
         <button onclick="exportDisExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
         <button onclick="generateDis()" style="width:auto;background:#FFF3E0;color:#E65100;">一键生成</button>
         <button onclick="saveDis()" style="width:auto;">保存</button>
@@ -2147,7 +2148,11 @@
       document.getElementById('dis-modal').style.display = 'flex'
       lockBodyScroll()
       document.getElementById('dis-month').value = localMonthStr()
+      document.getElementById('dis-teacher-cycle').value = ls.getItem('jiayuan-dis-teacher-cycle') || ''
       renderDis()
+    }
+    function saveDisTeacherCycle() {
+      ls.setItem('jiayuan-dis-teacher-cycle', document.getElementById('dis-teacher-cycle').value || '')
     }
     function closeDisModal() {
       document.getElementById('dis-modal').style.display = 'none'
@@ -2232,19 +2237,27 @@
     function generateDis() {
       const month = document.getElementById('dis-month').value
       if (!month) return alert('请先选择月份')
-      let n = 0
+      // 1) √ 格：未填的打 √
+      let nSq = 0
       document.querySelectorAll('#dis-table-container .cell-sq').forEach(el => {
         if (el.textContent.trim() === '') {
           el.textContent = '√'
           el.classList.add('on')
-          n++
+          nSq++
         }
       })
-      if (n === 0) {
-        alert('通风消毒记录表：没有需要填充的空格（已全部打上√或已填写）')
-        return
+      // 2) 签字栏(记录老师)：按轮换顺序一天一个（已填不动）
+      const cycRaw = (document.getElementById('dis-teacher-cycle').value || '').trim()
+      const names = cycRaw ? cycRaw.split(/[\s,，、]+/).filter(Boolean) : []
+      let nSign = 0
+      const signs = [...document.querySelectorAll('#dis-table-container [data-dis-sign]')]
+      if (names.length) {
+        signs.forEach((el, i) => { if (el.value.trim() === '') { el.value = names[i % names.length]; nSign++ } })
       }
-      alert('已为 ' + n + ' 个空格自动打上 √\n点击「保存」即可持久化（签字栏请手动填写）')
+      const parts = ['已为 ' + nSq + ' 个空格自动打上 √']
+      if (names.length) parts.push('「记录老师」按轮换顺序（' + names.join('、') + '）一天一个自动填好，共填 ' + nSign + ' 天')
+      else parts.push('签字栏(记录老师)未填轮换顺序，请在上方「教师轮换顺序」框输入老师姓名（逗号分隔）后再点一键生成。')
+      alert(parts.join('\n') + '\n点击「保存」即可持久化')
     }
     function exportDisExcel() {
       const cls = getCurrentClass()
