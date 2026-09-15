@@ -1859,7 +1859,7 @@
       // 列宽定义（像素，基于原始 xls 的 width/256*10 换算）
       const colNameW = 74
       const colAmpmW = 71
-      const colDateW = 50
+      const colDateW = 66
 
       // 样式辅助函数
       const TD = (content, opts = {}) => {
@@ -1867,6 +1867,7 @@
         if (opts.fs) style.push(`font-size:${opts.fs}pt`)
         if (opts.h) style.push(`height:${opts.h}pt`)
         if (opts.w) style.push(`width:${opts.w}px`)
+        if (opts.nf) style.push('mso-number-format:' + opts.nf)
         if (opts.bd) style.push('border:0.5pt solid #000000')
         if (opts.bd === false) style.push('border:none')
         if (opts.ta) style.push(`text-align:${opts.ta}`)
@@ -1904,11 +1905,11 @@
         const childData = saved[child.id] || { am: {}, pm: {} }
         // 上午行
         html += `<tr>${TD(child.name, { w: colNameW, fs: 12, h: 15, bd: true, ta: 'left', va: 'middle', rs: 2 })}${TD('上午', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
-        workdays.forEach(d => { html += TD(childData.am[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
+        workdays.forEach(d => { html += TD(childData.am[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle', nf: "'0.0'" }) })
         html += `</tr>\n`
         // 下午行
         html += `<tr>${TD('下午', { w: colAmpmW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' })}`
-        workdays.forEach(d => { html += TD(childData.pm[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle' }) })
+        workdays.forEach(d => { html += TD(childData.pm[d] || '', { w: colDateW, fs: 12, h: 15, bd: true, ta: 'right', va: 'middle', nf: "'0.0'" }) })
         html += `</tr>\n`
       })
 

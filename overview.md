@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v55**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v56**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,12 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v56 · 点名册导出体温列列宽加宽 + 强制一位小数）
+
+- 点名册导出 `.xls` 中，日期/体温列列宽由 `50px` 加宽到 `66px`。此前列宽不足，Excel 打开后会把数值按显示宽度四舍五入（如 `36.7` 显示成 `37`）。
+- 体温数据单元格新增 `mso-number-format:'0.0'`，强制按一位小数显示（`36.7`/`36.0` 不再进位或被吞掉小数位）；△（没来）与空格不受影响。
+- `sw.js` 升级到 v56。
 
 ## 本次改动（v55 · 交接班幼儿缺勤默认填 0）
 
