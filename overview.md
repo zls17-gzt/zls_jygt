@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v48**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v49**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,12 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v49 · 点名册一键生成随机体温）
+
+- 点名册弹窗新增「一键生成」按钮：点击后为所有**未填**的体温单元格随机填入 `36.1~36.6`（每 0.1 度一档）；已填数值或 `△（没来）` 的单元格保持不变。
+- 生成后需点「保存体温」持久化，再「导出Excel」；导出版式不变，仍与原 xls 1:1。
+- `sw.js` 升级到 v49。
 
 ## 本次改动（v48 · 点名册日期列加宽，体温值完整显示）
 

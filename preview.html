@@ -548,6 +548,7 @@
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <input type="month" id="attendance-month" onchange="renderAttendanceTable()" style="width:auto;margin:0;">
         <button onclick="exportAttendanceExcel()" style="width:auto;background:#E8F5E9;color:#2E7D32;">导出Excel</button>
+        <button onclick="generateAttendanceTemps()" style="width:auto;background:#FFF3E0;color:#E65100;">一键生成</button>
         <button onclick="saveAttendanceData()" style="width:auto;">保存体温</button>
       </div>
       <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
@@ -1807,6 +1808,22 @@
 
       html += '</tbody></table>'
       container.innerHTML = html
+    }
+
+    // 一键生成：把未填的体温格随机填上 36.1~36.6（已填 / △ 不动）
+    function generateAttendanceTemps() {
+      const selects = document.querySelectorAll('#attendance-table-container select[data-attend-child]')
+      if (selects.length === 0) return alert('请先选择月份生成点名册')
+      let count = 0
+      selects.forEach(sel => {
+        if (!sel.value) {
+          const t = (36.1 + Math.random() * 0.5).toFixed(1)
+          sel.value = t
+          count++
+        }
+      })
+      if (count > 0) alert('已为 ' + count + ' 个空单元格随机生成体温（36.1~36.6）✅\n记得点「保存体温」再导出')
+      else alert('没有空的体温单元格，已全部填好 ✅')
     }
 
     function exportAttendanceExcel() {
