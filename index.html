@@ -551,6 +551,7 @@
         <button onclick="generateAttendanceTemps()" style="width:auto;background:#FFF3E0;color:#E65100;">一键生成</button>
         <button onclick="saveAttendanceData()" style="width:auto;">保存体温</button>
       </div>
+      <div id="attendance-datebar"></div>
       <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成点名册</p>
       </div>
@@ -1763,10 +1764,49 @@
         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
           days.push(d.getDate())
         }
-        d.setDate(d.getDate() + 1)
+    d.setDate(d.getDate() + 1)
+  }
+  return days
+}
+
+  // 国家法定工作日：2026 年国务院办公厅放假安排（含调休补班）
+  const LEGAL_WORKDAYS_2026 = {
+    // 放假的日期（区间内每天都不上班）
+    holidays: [
+      '2026-01-01','2026-01-02','2026-01-03',
+      '2026-02-15','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-02-21','2026-02-22','2026-02-23',
+      '2026-04-04','2026-04-05','2026-04-06',
+      '2026-05-01','2026-05-02','2026-05-03','2026-05-04','2026-05-05',
+      '2026-06-19','2026-06-20','2026-06-21',
+      '2026-09-25','2026-09-26','2026-09-27',
+      '2026-10-01','2026-10-02','2026-10-03','2026-10-04','2026-10-05','2026-10-06','2026-10-07'
+    ],
+    // 调休补班日（周末也要上班）
+    workdays: [
+      '2026-01-04',
+      '2026-02-14','2026-02-28',
+      '2026-05-09',
+      '2026-09-20',
+      '2026-10-10'
+    ]
+  }
+  // 计算某月国家法定工作日；非 2026 年回退周一至周五（可用自定义日期栏微调）
+  function getLegalWorkdays(year, month) {
+    const data = (year === 2026) ? LEGAL_WORKDAYS_2026 : null
+    const days = []
+    const d = new Date(year, month - 1, 1)
+    while (d.getMonth() === month - 1) {
+      const ymd = year + '-' + String(month).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      let isWork = (d.getDay() !== 0 && d.getDay() !== 6)
+      if (data) {
+        if (data.workdays.indexOf(ymd) !== -1) isWork = true
+        else if (data.holidays.indexOf(ymd) !== -1) isWork = false
       }
-      return days
+      if (isWork) days.push(d.getDate())
+      d.setDate(d.getDate() + 1)
     }
+    return days
+  }
 
     // 体温下拉选项：可选项（36.0~38.0 每 0.1 度）+ △（没来）
     function attendanceTempOptions(val) {
@@ -1795,7 +1835,9 @@
       }
       currentAttendanceMonth = monthVal
       const [year, month] = monthVal.split('-').map(Number)
-      const workdays = getWorkdays(year, month)
+      const workdays = resolveDates(cls, monthVal, true)
+      const bar = document.getElementById('attendance-datebar')
+      if (bar) bar.innerHTML = renderDateBar('attendance')
       const saved = getAttendanceData(cls.id, monthVal)
 
       let html = '<table style="border-collapse:collapse;font-size:12px;white-space:nowrap;">'
@@ -1852,7 +1894,7 @@
       const monthVal = document.getElementById('attendance-month').value
       if (!monthVal) return alert('请选择月份')
       const [year, month] = monthVal.split('-').map(Number)
-      const workdays = getWorkdays(year, month)
+      const workdays = resolveDates(cls, monthVal, true)
       const saved = getAttendanceData(cls.id, monthVal)
       const totalCols = 2 + workdays.length
 
@@ -1940,11 +1982,11 @@
       ls.setItem(TABLEDATES_KEY, JSON.stringify(all))
     }
     // 优先用本班本月自定义的园历日期，没有则默认周一至周五
-    function resolveDates(cls, monthVal) {
+    function resolveDates(cls, monthVal, useLegal) {
       const custom = getTableDates(cls, monthVal)
       if (custom) return custom
       const [y, m] = monthVal.split('-').map(Number)
-      return getWorkdays(y, m)
+      return useLegal ? getLegalWorkdays(y, m) : getWorkdays(y, m)
     }
     function renderDateBar(formKey) {
       const cls = getCurrentClass()
@@ -1958,7 +2000,7 @@
       })
       h += '<input type="date" id="' + formKey + '-adddate" class="datebar-input">'
       h += '<button class="datebar-btn" onclick="addTableDate(\'' + formKey + '\')">＋加这天</button>'
-      h += '<button class="datebar-btn gray" onclick="resetTableDates(\'' + formKey + '\')">↺恢复周一至周五</button>'
+      h += '<button class="datebar-btn gray" onclick="resetTableDates(\'' + formKey + '\')">↺恢复默认日期</button>'
       h += '</div>'
       return h
     }
@@ -1991,6 +2033,7 @@
       if (formKey === 'obs-form') renderObsForm()
       else if (formKey === 'dis') renderDis()
       else if (formKey === 'han') renderHan()
+      else if (formKey === 'attendance') renderAttendanceTable()
     }
 
     // 导出用单元格：精确控制字体、字号、行高、列宽、边框、对齐

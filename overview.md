@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v56**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v57**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,14 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v57 · 点名册日期按国家法定工作日 + 可自定义日期）
+
+- 点名册默认日期由「周一至周五」改为「2026 年国家法定工作日」：内置国务院办公厅 2026 年放假安排（元旦/春节/清明/劳动/端午/中秋/国庆），自动剔除法定假日、补入调休补班日（如 1/4、2/14、2/28、5/9、9/20、10/10）。
+- 新增 `getLegalWorkdays(year, month)`；`resolveDates` 增加 `useLegal` 参数，点名册传 `true`，观察表/消毒表/交接班维持原默认（周一至周五，仍可用各自日期栏自定义）。
+- 点名册接入「自定义日期栏」（`renderDateBar('attendance')`）：可手动＋加某天 / ×删除某天 / ↺恢复默认日期；数据与导出同步（导出同样走法定工作日默认 + 自定义覆盖）。
+- 非 2026 年暂无内置法定数据，回退周一至周五，可用自定义日期栏微调。
+- `sw.js` 升级到 v57。
 
 ## 本次改动（v56 · 点名册导出体温列列宽加宽 + 强制一位小数）
 
