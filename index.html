@@ -2490,6 +2490,17 @@
       if (act < 0) act = 0
       actualEl.value = String(act)
     }
+    // 统计某天「全天没来」的幼儿数：上午和下午都是△才计缺勤，半天没来不算
+    function countHanAbsent(att, cls, day) {
+      let n = 0
+      ;(cls.children || []).forEach(c => {
+        const cd = att[c.id] || { am: {}, pm: {} }
+        const am = (cd.am && cd.am[day]) || ''
+        const pm = (cd.pm && cd.pm[day]) || ''
+        if (am === '△' && pm === '△') n++
+      })
+      return n
+    }
     // 一键生成：幼儿在园情况未填→一切正常；交班教师按顺序轮流；接班教师填其余名字；幼儿应到→全班人数；幼儿实到=应到-缺勤
     function generateHan() {
       const month = document.getElementById('han-month').value
@@ -2529,10 +2540,17 @@
           if (el.value.trim() === '') { el.value = String(total); nShould++ }
         })
       }
-      // 3.5) 幼儿缺勤：未填 → 默认 0（全勤默认，明确写入单元格）
+      // 3.5) 幼儿缺勤：依据点名册「全天没来」自动计（上午和下午都为△才计缺勤，半天不算）
+      const att = getAttendanceData(cls.id, month)
+      const hasAtt = total > 0 && (cls.children || []).some(c => {
+        const cd = att[c.id] || {}
+        return (cd.am && Object.keys(cd.am).length) || (cd.pm && Object.keys(cd.pm).length)
+      })
       let nAbsent = 0
       document.querySelectorAll('#han-table-container [data-han-f="absent"]').forEach(el => {
-        if (el.value.trim() === '') { el.value = '0'; nAbsent++ }
+        const d = el.getAttribute('data-han-day')
+        if (hasAtt) { el.value = String(countHanAbsent(att, cls, d)); nAbsent++ }
+        else if (el.value.trim() === '') { el.value = '0'; nAbsent++ }
       })
       // 4) 幼儿实到 = 应到 - 缺勤（实到不为负）
       let nActual = 0
@@ -2541,7 +2559,7 @@
       })
       let msg = '已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」；'
       msg += '\n交班/接班教师按轮换顺序（' + names.join('、') + '）一天一交接自动填好（交班 ' + nT1 + '、接班 ' + (nT2 + nT3) + ' 格）；'
-      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天；「幼儿缺勤」默认填 0 共 ' + nAbsent + ' 天；「幼儿实到」已按「应到 − 缺勤」自动算出 ' + nActual + ' 天。'
+      if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天；「幼儿缺勤」' + (hasAtt ? '已按点名册「全天没来」自动算出（半天不算）' : '未检测到点名册数据，默认填 0') + ' 共 ' + nAbsent + ' 天；「幼儿实到」已按「应到 − 缺勤」自动算出 ' + nActual + ' 天。'
       else msg += '\n「幼儿应到」未填（当前班级花名册为空，请先在设置里添加幼儿）。'
       msg += '\n点击「保存」即可持久化。'
       alert(msg)

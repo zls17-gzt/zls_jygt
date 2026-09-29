@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jiayuan-v58'
+const CACHE_NAME = 'jiayuan-v59'
 const ASSETS = ['./', './index.html', './manifest.json',
                 './icon-192.png', './icon-512.png',
                 './icons/mascot.png', './icons/eat.png', './icons/work.png',

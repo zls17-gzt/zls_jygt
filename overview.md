@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v58**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v59**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,13 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v59 · 交接班缺勤联动点名册「全天没来」）
+
+- 交接班记录表「一键生成」新增缺勤联动：读取当月点名册数据，按天统计「上午和下午都为 `△`（没来）」的幼儿数记为幼儿缺勤；半天没来（仅上午或仅下午为 `△`）、未填体温的，均不计入缺勤。
+- 幼儿应到仍按全班人数自动填（未填才填）；幼儿实到按「应到 − 缺勤」联动重算。
+- 若未检测到当月点名册数据（还没在点名册填好并保存过），缺勤保持未填则默认填 `0`，并提示先在点名册保存。
+- `sw.js` 升级到 v59。
 
 ## 本次改动（v58 · 点名册冻结「姓名/上下午」列 + 日期表头吸顶）
 
