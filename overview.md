@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v57**。
+方式B 纯静态 PWA，Service Worker 缓存版本 **jiayuan-v58**。
 
 **永久网址（GitHub Pages，自主可控）：**
 https://zls17-gzt.github.io/zls_jygt/
@@ -33,6 +33,15 @@ https://fe490d420d5d48e198d4e774eb14927b.app.workbuddy.link
 - 统一补上：外层 `align-items:flex-start` + `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 80px)`；内层卡片底部留白 `calc(16px + env(safe-area-inset-bottom, 0px) + 80px)`。
 - 至此四类园所弹窗（点名册 / 观察表 / 通风消毒记录表 / 交接班表）底部留白一致。
 - `sw.js` 升级到 v45。
+
+## 本次改动（v58 · 点名册冻结「姓名/上下午」列 + 日期表头吸顶）
+
+- 横向滚动点名册时，「姓名」「上/下午」两列用 `position: sticky` 冻结在左侧，始终可见，方便对照填写。
+- 表格容器由 `overflow-y:hidden` 改为 `overflow:auto; max-height:60vh`，表格自身承担纵向滚动，日期表头 `thead th` 吸顶（`top:0`），孩子多时下滚也能看到日期。
+- 为让 sticky 生效，表格边框由 `border-collapse:collapse` 改为 `separate; border-spacing:0`，改用「只画右/下边框 + 首列补左边框 + 表头补上边框」保持单线网格样式。
+- 「上/下午」列的冻结偏移由 `syncAttendanceStickyOffset()` 按「姓名」列实际宽度动态设置 CSS 变量 `--att-c1w`（姓名列宽随姓名长短自适应），窗口 resize 时重算。
+- 冻结列加浅阴影区分滚动区；导出 Excel 版式不受影响（导出独立生成 HTML，读 DOM 文本）。
+- `sw.js` 升级到 v58。
 
 ## 本次改动（v57 · 点名册日期按国家法定工作日 + 可自定义日期）
 

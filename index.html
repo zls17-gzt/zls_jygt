@@ -329,6 +329,21 @@
     .datebar-input { width: auto; margin: 0; padding: 4px 6px; font-size: 12px; }
     .datebar-btn { width: auto; padding: 5px 10px; font-size: 12px; background: #FFF3E0; color: #8D6E63; }
     .datebar-btn.gray { background: #EFEFEF; color: #5D4037; }
+
+    /* ===== 点名册：冻结左侧「姓名 / 上下午」列 + 吸顶日期表头 ===== */
+    .att-table { border-collapse: separate; border-spacing: 0; font-size: 12px; white-space: nowrap; }
+    .att-table th, .att-table td { border-right: 1px solid #E0C97F; border-bottom: 1px solid #E0C97F; }
+    .att-table thead th { border-top: 1px solid #E0C97F; }
+    .att-table .att-c1 { border-left: 1px solid #E0C97F; }
+    /* 表头吸顶 */
+    .att-table thead th { position: sticky; top: 0; z-index: 4; background: #FFF3E0; }
+    /* 前两列冻结在左侧 */
+    .att-table .att-c1 { position: sticky; left: 0; z-index: 3; background: #FFFBF0; box-shadow: 2px 0 4px -1px rgba(93,64,55,.20); }
+    .att-table .att-c2 { position: sticky; left: var(--att-c1w, 60px); z-index: 3; background: #FFFBF0; box-shadow: 2px 0 4px -1px rgba(93,64,55,.20); }
+    .att-table tbody tr.att-pm .att-c2 { background: #FFFFFF; }
+    /* 左上角交叉区压在两层之上 */
+    .att-table thead th.att-c1, .att-table thead th.att-c2 { z-index: 6; background: #FFF3E0; }
+    .att-table select { width: 100%; margin: 0; padding: 2px; border: none; text-align: center; font-size: 11px; box-sizing: border-box; background: #fff; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -552,7 +567,7 @@
         <button onclick="saveAttendanceData()" style="width:auto;">保存体温</button>
       </div>
       <div id="attendance-datebar"></div>
-      <div id="attendance-table-container" style="overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden;width:100%;display:block;">
+      <div id="attendance-table-container" style="overflow:auto;-webkit-overflow-scrolling:touch;width:100%;max-height:60vh;border-radius:8px;display:block;">
         <p style="color:var(--muted);font-size:13px;">请选择月份后生成点名册</p>
       </div>
     </div>
@@ -1840,12 +1855,12 @@
       if (bar) bar.innerHTML = renderDateBar('attendance')
       const saved = getAttendanceData(cls.id, monthVal)
 
-      let html = '<table style="border-collapse:collapse;font-size:12px;white-space:nowrap;">'
-      html += '<thead><tr style="background:#FFF3E0;">'
-      html += '<th style="border:1px solid #E0C97F;padding:4px;min-width:56px;">姓名</th>'
-      html += '<th style="border:1px solid #E0C97F;padding:4px;min-width:36px;">上/下午</th>'
+      let html = '<table class="att-table">'
+      html += '<thead><tr>'
+      html += '<th class="att-c1" style="padding:4px;min-width:56px;">姓名</th>'
+      html += '<th class="att-c2" style="padding:4px;min-width:36px;">上/下午</th>'
       workdays.forEach(day => {
-        html += `<th style="border:1px solid #E0C97F;padding:4px;min-width:60px;font-size:11px;">${day}日</th>`
+        html += `<th style="padding:4px;min-width:60px;font-size:11px;">${day}日</th>`
       })
       html += '</tr></thead><tbody>'
 
@@ -1854,14 +1869,14 @@
         ;['am', 'pm'].forEach((period, idx) => {
           const periodLabel = period === 'am' ? '上午' : '下午'
           const bg = idx === 0 ? '#FFFBF0' : '#FFFFFF'
-          html += `<tr style="background:${bg};">`
+          html += `<tr class="${idx === 0 ? 'att-am' : 'att-pm'}" style="background:${bg};">`
           if (idx === 0) {
-            html += `<td rowspan="2" style="border:1px solid #E0C97F;padding:4px;text-align:center;font-weight:bold;font-size:12px;">${escapeHtml(child.name)}</td>`
+            html += `<td class="att-c1" rowspan="2" style="padding:4px;text-align:center;font-weight:bold;font-size:12px;">${escapeHtml(child.name)}</td>`
           }
-          html += `<td style="border:1px solid #E0C97F;padding:4px;text-align:center;font-size:11px;">${periodLabel}</td>`
+          html += `<td class="att-c2" style="padding:4px;text-align:center;font-size:11px;">${periodLabel}</td>`
           workdays.forEach(day => {
             const val = childData[period][day] || ''
-            html += `<td style="border:1px solid #E0C97F;padding:2px;"><select data-attend-child="${child.id}" data-day="${day}" data-period="${period}" style="width:100%;margin:0;padding:2px;border:none;text-align:center;font-size:11px;box-sizing:border-box;background:#fff;cursor:pointer;">${attendanceTempOptions(val)}</select></td>`
+            html += `<td style="padding:2px;"><select data-attend-child="${child.id}" data-day="${day}" data-period="${period}">${attendanceTempOptions(val)}</select></td>`
           })
           html += '</tr>'
         })
@@ -1869,7 +1884,17 @@
 
       html += '</tbody></table>'
       container.innerHTML = html
+      syncAttendanceStickyOffset()
     }
+
+    // 冻结列偏移：让「上/下午」列紧贴「姓名」列右侧（姓名列宽随姓名长短自适应）
+    function syncAttendanceStickyOffset() {
+      const table = document.querySelector('#attendance-table-container .att-table')
+      if (!table) return
+      const c1 = table.querySelector('thead th.att-c1')
+      if (c1) table.style.setProperty('--att-c1w', c1.offsetWidth + 'px')
+    }
+    window.addEventListener('resize', syncAttendanceStickyOffset)
 
     // 一键生成：把未填的体温格随机填上 36.1~36.6（已填 / △ 不动）
     function generateAttendanceTemps() {
