@@ -2501,21 +2501,48 @@
       })
       return n
     }
-    // 一键生成：幼儿在园情况未填→一切正常；交班教师按顺序轮流；接班教师填其余名字；幼儿应到→全班人数；幼儿实到=应到-缺勤
+    // 统计某天「全天没来」的幼儿姓名：上午和下午都是△才计缺勤（半天不算），与缺勤口径一致
+    function getHanAbsentNames(att, cls, day) {
+      const names = []
+      ;(cls.children || []).forEach(c => {
+        const cd = att[c.id] || { am: {}, pm: {} }
+        const am = (cd.am && cd.am[day]) || ''
+        const pm = (cd.pm && cd.pm[day]) || ''
+        if (am === '△' && pm === '△') names.push(c.name)
+      })
+      return names
+    }
+    // 一键生成：幼儿在园情况→按点名册当天「全天没来」填「姓名请假」（多名逗号隔开），无缺勤则「一切正常」；
+    // 交班教师按顺序轮流；接班教师填其余名字；幼儿应到→全班人数；幼儿缺勤→点名册全天没来；实到=应到-缺勤
     function generateHan() {
       const month = document.getElementById('han-month').value
       if (!month) return alert('请先选择月份')
       const cls = getCurrentClass()
-      // 1) 幼儿在园情况：未填 → 一切正常
+      const total = (cls.children || []).length
+      // 读取点名册当月数据（用于幼儿在园情况、缺勤）
+      const att = getAttendanceData(cls.id, month)
+      const hasAtt = total > 0 && (cls.children || []).some(c => {
+        const cd = att[c.id] || {}
+        return (cd.am && Object.keys(cd.am).length) || (cd.pm && Object.keys(cd.pm).length)
+      })
+      // 1) 幼儿在园情况：未填 → 按点名册当天「全天没来」填「姓名请假」（多名逗号隔开）；无缺勤则「一切正常」
       let nSit = 0
       document.querySelectorAll('#han-table-container [data-han-f="situation"]').forEach(el => {
-        if (el.value.trim() === '') { el.value = '一切正常'; nSit++ }
+        if (el.value.trim() !== '') return
+        const d = el.getAttribute('data-han-day')
+        let txt = '一切正常'
+        if (hasAtt) {
+          const absentNames = getHanAbsentNames(att, cls, d)
+          if (absentNames.length > 0) txt = absentNames.map(n => n + '请假').join('，')
+        }
+        el.value = txt
+        nSit++
       })
       // 2) 教师：轮换顺序（交班轮流，接班填其余名字）
       const cycRaw = (document.getElementById('han-teacher-cycle').value || '').trim()
       const names = cycRaw ? cycRaw.split(/[\s,，、]+/).filter(Boolean) : []
       if (names.length === 0) {
-        alert('已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」。\n交班/接班教师未填轮换顺序：请在上方「教师轮换顺序」框输入老师姓名（逗号分隔，如 袁利利,周晓丽）后再点一键生成。')
+        alert('已为 ' + nSit + ' 条「幼儿在园情况」填好' + (hasAtt ? '（含按点名册「全天没来」生成的「姓名请假」）' : '（无点名册数据，默认「一切正常」）') + '。\n交班/接班教师未填轮换顺序：请在上方「教师轮换顺序」框输入老师姓名（逗号分隔，如 袁利利,周晓丽）后再点一键生成。')
         return
       }
       const rows = [...document.querySelectorAll('#han-table-container [data-han-day]')]
@@ -2533,7 +2560,6 @@
         if (t3El && t3El.value.trim() === '') { t3El.value = rest[1] || ''; nT3++ }
       })
       // 3) 幼儿应到：未填 → 全班人数（花名册人数）
-      const total = (cls.children || []).length
       let nShould = 0
       if (total > 0) {
         document.querySelectorAll('#han-table-container [data-han-f="should"]').forEach(el => {
@@ -2541,11 +2567,6 @@
         })
       }
       // 3.5) 幼儿缺勤：依据点名册「全天没来」自动计（上午和下午都为△才计缺勤，半天不算）
-      const att = getAttendanceData(cls.id, month)
-      const hasAtt = total > 0 && (cls.children || []).some(c => {
-        const cd = att[c.id] || {}
-        return (cd.am && Object.keys(cd.am).length) || (cd.pm && Object.keys(cd.pm).length)
-      })
       let nAbsent = 0
       document.querySelectorAll('#han-table-container [data-han-f="absent"]').forEach(el => {
         const d = el.getAttribute('data-han-day')
@@ -2557,7 +2578,7 @@
       document.querySelectorAll('#han-table-container [data-han-f="should"]').forEach(el => {
         recomputeHanActual(el); nActual++
       })
-      let msg = '已为 ' + nSit + ' 条「幼儿在园情况」填空为「一切正常」；'
+      let msg = '已为 ' + nSit + ' 条「幼儿在园情况」填好' + (hasAtt ? '（按点名册「全天没来」生成「姓名请假」，无缺勤填「一切正常」）' : '（无点名册数据，默认「一切正常」）') + '；'
       msg += '\n交班/接班教师按轮换顺序（' + names.join('、') + '）一天一交接自动填好（交班 ' + nT1 + '、接班 ' + (nT2 + nT3) + ' 格）；'
       if (total > 0) msg += '\n「幼儿应到」按全班人数（' + total + ' 人）自动填好 ' + nShould + ' 天；「幼儿缺勤」' + (hasAtt ? '已按点名册「全天没来」自动算出（半天不算）' : '未检测到点名册数据，默认填 0') + ' 共 ' + nAbsent + ' 天；「幼儿实到」已按「应到 − 缺勤」自动算出 ' + nActual + ' 天。'
       else msg += '\n「幼儿应到」未填（当前班级花名册为空，请先在设置里添加幼儿）。'
